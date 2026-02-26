@@ -1,6 +1,6 @@
 This Rental System is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-It is a simple property management system with pictures to display for rela etsate agenst and tenants to view. The administrator/staff can Create, Retreive, Update and Delete (CRUD) the properties via the admin page.
+It is a simple property management system with pictures to display for real estate agents and potential tenants to view. The administrator/staff can Create, Retreive, Update and Delete (CRUD) the properties via the admin page.
 
 ## Getting Started
 
