@@ -68,7 +68,6 @@ export default async function EditPropertyPage({
                                 >
                                     <option value="AVAILABLE">AVAILABLE</option>
                                     <option value="RENTED">RENTED</option>
-                                    <option value="MAINTENANCE">MAINTENANCE</option>
                                 </select>
                             </div>
 
@@ -110,7 +109,10 @@ export default async function EditPropertyPage({
                             <p className="text-sm text-gray-500">The first photo in the list is the cover image. Drag to reorder.</p>
                         </div>
 
-                        <ImageManager initialImages={property.images || []} />
+                        <ImageManager
+                            initialImages={property.images || []}
+                            propertyId={property.id}
+                        />
                     </section>
 
                     {/* 3. SUBMIT SECTION */}

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import fs from "fs/promises";
 import path from "path";
+import { logAction } from "@/lib/logger";
 
 /**
  * Helper to check admin authorization
@@ -25,27 +26,27 @@ export async function addProperty(formData: FormData) {
 
     const title = formData.get("title") as string;
     const address = formData.get("address") as string;
-
-    // Rental Formatting
     const rawRental = formData.get("rental") as string;
     const cleanRental = rawRental ? parseFloat(rawRental.replace(/,/g, "")) : 0;
-
     const rentalDuration = formData.get("rentalDuration") as string;
 
-    // Handle Image Uploads
     const imageFiles = formData.getAll("images") as File[];
     const imageUrls: string[] = [];
+
+    const uploadDir = path.join(process.cwd(), "public", "uploads");
+    await fs.mkdir(uploadDir, { recursive: true });
 
     if (imageFiles && imageFiles.length > 0) {
         for (const file of imageFiles) {
             if (file.size > 0 && file.name !== 'undefined') {
                 const buffer = Buffer.from(await file.arrayBuffer());
                 const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
-                const filePath = path.join(process.cwd(), "public/uploads", fileName);
+                const filePath = path.join(uploadDir, fileName);
 
-                await fs.mkdir(path.join(process.cwd(), "public/uploads"), { recursive: true });
                 await fs.writeFile(filePath, buffer);
                 imageUrls.push(`/uploads/${fileName}`);
+                // LOG: Successful upload
+                await logAction(`New property image uploaded: ${fileName}`);
             }
         }
     }
@@ -63,7 +64,6 @@ export async function addProperty(formData: FormData) {
 
     revalidatePath("/admin");
     revalidatePath("/");
-    // Note: We don't redirect here so the Quick Add toggle can reset
 }
 
 /**
@@ -76,36 +76,65 @@ export async function updateProperty(formData: FormData) {
     const title = formData.get("title") as string;
     const address = formData.get("address") as string;
     const status = formData.get("status") as any;
-
-    // Rental Formatting
     const rawRental = formData.get("rental") as string;
     const cleanRental = rawRental ? parseFloat(rawRental.replace(/,/g, "")) : 0;
-
     const rentalDuration = formData.get("rentalDuration") as string;
     const rentalStart = formData.get("rentalStart") as string;
 
-    // ✨ IMAGE LOGIC: Combine reordered existing images + new uploads
-    // 1. Get the list of images kept/reordered in ImageManager
-    const existingImages = formData.getAll("existingImages") as string[];
+    // 1. Get current images from Database
+    const currentProperty = await prisma.property.findUnique({
+        where: { id },
+        select: { images: true }
+    });
 
-    // 2. Process new files
+    // 2. Get images currently in the frontend ImageManager (existingImages inputs)
+    const existingImagesInForm = formData.getAll("existingImages") as string[];
+
+    // --- START: DELETION TRACKING & DISK CLEANUP ---
+    if (currentProperty?.images) {
+        // Filter out images that are in DB but NOT in the new form data
+        const imagesToDelete = currentProperty.images.filter(
+            (img) => !existingImagesInForm.includes(img)
+        );
+
+        for (const imagePath of imagesToDelete) {
+            try {
+                // Remove leading slash so path.join works correctly with 'public'
+                const relativePath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+                const fullPath = path.join(process.cwd(), "public", relativePath);
+
+                // Perform physical disk deletion
+                await fs.access(fullPath);
+                await fs.unlink(fullPath);
+
+                // HIGHLIGHT: Tracking successful deletion in log
+                await logAction(`CLEANUP SUCCESS: Deleted file ${imagePath} from disk.`);
+            } catch (err) {
+                // HIGHLIGHT: Tracking failed deletion in log (e.g., file already gone)
+                await logAction(`CLEANUP SKIPPED/FAILED: ${imagePath} - check if file exists.`);
+            }
+        }
+    }
+    // --- END: DELETION TRACKING ---
+
+    // 4. Handle new file uploads
     const newFiles = formData.getAll("newImages") as File[];
     const newImageUrls: string[] = [];
+    const uploadDir = path.join(process.cwd(), "public", "uploads");
 
     for (const file of newFiles) {
         if (file && file.size > 0) {
             const buffer = Buffer.from(await file.arrayBuffer());
             const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
-            const filePath = path.join(process.cwd(), "public/uploads", fileName);
+            const filePath = path.join(uploadDir, fileName);
 
-            await fs.mkdir(path.join(process.cwd(), "public/uploads"), { recursive: true });
+            await fs.mkdir(uploadDir, { recursive: true });
             await fs.writeFile(filePath, buffer);
             newImageUrls.push(`/uploads/${fileName}`);
         }
     }
 
-    // 3. Merge: Reordered ones first, then brand new ones
-    const finalImages = [...existingImages, ...newImageUrls];
+    const finalImages = [...existingImagesInForm, ...newImageUrls];
 
     await prisma.property.update({
         where: { id },
@@ -120,6 +149,9 @@ export async function updateProperty(formData: FormData) {
         },
     });
 
+    // LOG: Final update success
+    await logAction(`UPDATE SUCCESS: Property ${id} database updated.`);
+
     revalidatePath("/admin");
     revalidatePath(`/admin/edit/${id}`);
     revalidatePath("/");
@@ -133,18 +165,77 @@ export async function updateProperty(formData: FormData) {
 export async function deleteProperty(id: string) {
     await checkAdmin();
 
-    if (!id || typeof id !== 'string') {
-        console.error("Delete failed: ID is not a string", id);
-        return;
-    }
+    const property = await prisma.property.findUnique({
+        where: { id },
+        select: { images: true }
+    });
 
-    // Optional: You could add logic here to delete the physical files 
-    // from /public/uploads using fs.unlink if you want to save disk space.
+    if (property?.images) {
+        for (const imagePath of property.images) {
+            try {
+                const relativePath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+                const fullPath = path.join(process.cwd(), "public", relativePath);
+                await fs.unlink(fullPath);
+                // LOG: Tracking each image deleted when property is removed
+                await logAction(`PROPERTY DELETE: Removed image file ${imagePath}`);
+            } catch (err) { }
+        }
+    }
 
     await prisma.property.delete({
         where: { id },
     });
 
+    await logAction(`PROPERTY DELETE SUCCESS: ID ${id} fully removed.`);
+
     revalidatePath("/admin");
     revalidatePath("/");
+}
+
+/**
+ * Instant Upload for ImageManager.tsx
+ */
+export async function uploadPropertyImage(propertyId: string, formData: FormData) {
+    await checkAdmin();
+    const file = formData.get("file") as File;
+    if (!file || file.size === 0) return null;
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+    const publicPath = `/uploads/${fileName}`;
+    const filePath = path.join(process.cwd(), "public", "uploads", fileName);
+
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, buffer);
+
+    await prisma.property.update({
+        where: { id: propertyId },
+        data: {
+            images: {
+                push: publicPath
+            }
+        }
+    });
+
+    // LOG: Instant upload tracking
+    await logAction(`INSTANT UPLOAD: Image ${fileName} added to property ${propertyId}`);
+
+    return publicPath;
+}
+
+/**
+ * Action: Instantly reorder images in the DB
+ */
+export async function reorderPropertyImages(id: string, images: string[]) {
+    await checkAdmin(); // Security first
+
+    await prisma.property.update({
+        where: { id },
+        data: { images },
+    });
+
+    await logAction(`REORDER SUCCESS: Property ${id} images updated via drag-drop.`);
+
+    // Refresh only the necessary parts of the cache
+    revalidatePath(`/admin/edit/${id}`);
 }
