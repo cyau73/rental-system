@@ -2,6 +2,8 @@ This Rental System is a [Next.js](https://nextjs.org) project bootstrapped with 
 
 It is a simple property management system with pictures to display for Real Estate Agents and potential tenants to view the properties. The Real Estate Property management team will have two roles - Admin & Staff that can Create, Retreive, Update and Delete (CRUD) the properties via the admin page.
 
+The system will upload the images to the server disk and allow drag-and-drop for easy organization of the pictures.
+
 ## Getting Started
 
 First, run the development server:
