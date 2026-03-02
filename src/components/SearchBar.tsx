@@ -29,9 +29,9 @@ export default function SearchBar() {
                 placeholder="Search address..."
                 defaultValue={searchParams.get("query")?.toString()}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="w-full border border-gray-200 p-3 pl-10 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"
+                className="w-full border border-gray-300 p-3 pl-10 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm text-black font-bold placeholder:text-gray-500 shadow-sm transition-all"
             />
-            <span className="absolute left-3 top-3.5 text-gray-400">
+            <span className="absolute left-3 top-3.5 text-black font-extrabold">
                 🔍
             </span>
             {isPending && (

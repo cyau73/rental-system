@@ -24,12 +24,12 @@ export default function PropertyListDraggable({ properties = [] }: { properties:
     const [items, setItems] = useState(properties);
     const [isMounted, setIsMounted] = useState(false);
 
-    // 1. Fix Hydration: Only render interactive DND after mount
+    // 1. Hydration Fix: Only render DND logic after browser mount
     useEffect(() => {
         setIsMounted(true);
     }, []);
 
-    // 2. Sync state if server props change (e.g., after a search or delete)
+    // 2. Sync state when server data updates (search/filters)
     useEffect(() => {
         setItems(properties);
     }, [properties]);
@@ -63,7 +63,6 @@ export default function PropertyListDraggable({ properties = [] }: { properties:
             item.id === id ? { ...item, isPinned: !item.isPinned } : item
         );
 
-        // Sort so pinned stay at top
         const sorted = [...newItems].sort((a, b) => {
             if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
             return 0;
@@ -78,7 +77,7 @@ export default function PropertyListDraggable({ properties = [] }: { properties:
         await updatePropertyOrder(updates);
     };
 
-    // Prevent Hydration Mismatch: Render a static placeholder on the server
+    // Static shell for Server-Side Rendering to prevent hydration errors
     if (!isMounted) {
         return (
             <div className="flex flex-col gap-4">
@@ -91,7 +90,7 @@ export default function PropertyListDraggable({ properties = [] }: { properties:
 
     if (items.length === 0) {
         return (
-            <div className="bg-white rounded-[2rem] border-2 border-dashed border-gray-200 py-20 text-center text-gray-400 text-xs italic">
+            <div className="bg-white rounded-[2rem] border-2 border-dashed border-gray-300 py-20 text-center text-black font-bold text-xs italic">
                 No properties found.
             </div>
         );
@@ -129,51 +128,75 @@ function SortablePropertyCard({ prop, onPin }: { prop: any; onPin: () => void })
             style={style}
             className={`group bg-white rounded-[1.5rem] md:rounded-[2rem] border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col lg:flex-row ${isDragging ? 'opacity-50 ring-2 ring-blue-500 shadow-xl' : ''}`}
         >
-            {/* DRAG & PIN CONTROLS */}
-            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+            {/* DRAG & PIN CONTROLS - Positioned Right-4 */}
+            <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
                 <button
                     {...attributes}
                     {...listeners}
-                    className="p-2.5 bg-white/90 backdrop-blur rounded-xl shadow-sm cursor-grab active:cursor-grabbing text-gray-400 hover:text-blue-600 border border-gray-100"
+                    className="p-2.5 bg-white/95 backdrop-blur-md rounded-xl shadow-sm cursor-grab active:cursor-grabbing text-black hover:text-blue-600 border border-gray-200"
                 >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 9h14M5 15h14" /></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <path d="M5 9h14M5 15h14" />
+                    </svg>
                 </button>
                 <button
                     onClick={(e) => { e.preventDefault(); onPin(); }}
-                    className={`p-2.5 rounded-xl shadow-sm border transition-all ${prop.isPinned ? 'bg-yellow-400 border-yellow-500 text-white' : 'bg-white/90 border-gray-100 text-gray-300 hover:text-yellow-600'}`}
+                    className={`p-2.5 rounded-xl shadow-sm border backdrop-blur-md transition-all ${prop.isPinned ? 'bg-yellow-400 border-yellow-500 text-black' : 'bg-white/95 border-gray-200 text-black'
+                        }`}
                 >
-                    📌
+                    <span className="text-lg leading-none">{prop.isPinned ? '📌' : '📍'}</span>
                 </button>
             </div>
 
-            {/* IMAGE */}
-            <div className="relative w-full lg:w-[320px] h-[240px] overflow-hidden bg-gray-100 flex-shrink-0">
-                <img
-                    src={prop.images?.[0] || "/placeholder.png"}
-                    alt={prop.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
+            {/* IMAGE / GREY PLACEHOLDER */}
+            <div className="relative w-full lg:w-[320px] h-[240px] overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">
+                {prop.images && prop.images.length > 0 && prop.images[0] ? (
+                    <img
+                        src={prop.images[0]}
+                        alt={prop.title}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).parentElement!.classList.add('bg-gray-200');
+                        }}
+                    />
+                ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                        <span className="text-[9px] font-black text-black uppercase tracking-widest">No Image</span>
+                    </div>
+                )}
             </div>
 
-            {/* CONTENT */}
+            {/* CONTENT - High Contrast for iPad */}
             <div className="p-4 lg:px-8 lg:py-6 flex flex-col justify-between flex-grow gap-4">
                 <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${prop.status === 'AVAILABLE' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                        <span
+                            style={{
+                                borderColor: prop.status === 'AVAILABLE' ? '#22c55e' : '#3b82f6', // Green-500 and Blue-500
+                                backgroundColor: prop.status === 'AVAILABLE' ? '#f0fdf4' : '#eff6ff' // Green-50 and Blue-50
+                            }}
+                            className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border-2 ${prop.status === 'AVAILABLE' ? 'bg-green-100 text-black border-green-500' : 'bg-blue-100 text-black border-blue-500'
+                                }`}>
                             {prop.status}
                         </span>
-                        <h3 className="text-lg font-bold text-gray-900 tracking-tight">{prop.title}</h3>
+                        <h3 className="text-lg font-extrabold text-black tracking-tight">{prop.title}</h3>
                     </div>
-                    <p className="text-gray-500 text-[11px]">📍 {prop.address}</p>
-                    <p className="text-base font-black text-blue-600 mt-2">${Number(prop.rental || 0).toLocaleString()}</p>
+                    <p className="text-black font-semibold text-[11px] opacity-90">📍 {prop.address}</p>
+                    <p className="text-base font-black text-blue-700 mt-2">${Number(prop.rental || 0).toLocaleString()}</p>
                 </div>
 
                 {/* ACTIONS */}
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
-                    <a href={whatsappLink} target="_blank" className="px-6 py-2.5 border border-gray-200 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:border-green-500 hover:text-green-600 transition-all">
+                    <a href={whatsappLink} target="_blank" className="px-6 py-2.5 border border-gray-400 rounded-xl text-[10px] font-black uppercase tracking-widest text-black hover:border-green-600 transition-all">
                         Share
                     </a>
-                    <Link href={`/admin/edit/${prop.id}`} className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold uppercase tracking-widest px-8 py-2.5 rounded-xl shadow-md">
+                    <Link href={`/admin/edit/${prop.id}`} className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest px-8 py-2.5 rounded-xl shadow-md">
                         Edit
                     </Link>
                     <DeletePropertyButton id={prop.id} />

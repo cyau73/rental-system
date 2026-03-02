@@ -67,9 +67,9 @@ export default async function AdminPage({
     <div className="min-h-screen bg-gray-50 font-sans selection:bg-blue-100">
       <AdminNav user={session.user} />
 
-      <main className="max-w-7xl mx-auto p-4 md:p-6 lg:p-10">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 lg:px-10 pt-4 md:pt-6 pb-10">
         {/* HEADER & FILTERS */}
-        <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Link href="/admin" className={getTabClass(!statusFilter)}>All</Link>
@@ -82,7 +82,6 @@ export default async function AdminPage({
           </div>
         </header>
 
-        {/* QUICK ADD FORM */}
         {/* QUICK ADD FORM */}
         <QuickAddToggle>
           <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-8">
