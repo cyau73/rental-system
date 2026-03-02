@@ -57,11 +57,6 @@ export default async function AdminPage({
         {/* HEADER & FILTERS */}
         <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Rental Management</h1>
-              <p className="text-xs text-gray-400 mt-1">Manage your properties and availability.</p>
-            </div>
-
             <div className="flex items-center gap-2">
               <Link href="/admin" className={getTabClass(!statusFilter)}>All</Link>
               <Link href={`/admin?status=AVAILABLE${query ? `&query=${query}` : ''}`} className={getTabClass(statusFilter === 'AVAILABLE')}>Available</Link>
