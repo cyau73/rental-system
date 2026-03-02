@@ -7,13 +7,13 @@ export default function AdminNav({ user }: { user: any }) {
       <div className="flex items-center gap-4">
         {/* LOGO INTEGRATION */}
         <Link href="/admin" className="flex items-center gap-3 group">
-          <img 
-            src="/icon.png" 
-            alt="May Properties Logo" 
-            className="w-10 h-10 object-contain transition-transform group-hover:scale-105" 
+          <img
+            src="/icon.png"
+            alt="May Properties Logo"
+            className="w-10 h-10 object-contain transition-transform group-hover:scale-105"
           />
           <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Rental Management
+            Rental Management System
           </h1>
         </Link>
 

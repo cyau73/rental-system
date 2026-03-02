@@ -3,10 +3,10 @@
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { logAction } from "@/lib/logger";
 import prisma from "@/lib/prisma";
 import fs from "fs/promises";
 import path from "path";
-import { logAction } from "@/lib/logger";
 
 /**
  * Helper to check admin authorization
@@ -238,4 +238,41 @@ export async function reorderPropertyImages(id: string, images: string[]) {
 
     // Refresh only the necessary parts of the cache
     revalidatePath(`/admin/edit/${id}`);
+}
+
+/**
+ * Action: Update Property Order and Pinned Status (Drag-and-Drop)
+ */
+export async function updatePropertyOrder(
+    items: { id: string; order: number; isPinned: boolean }[]
+) {
+    // 1. SECURITY: Ensure only admins can trigger reordering
+    await checkAdmin();
+
+    try {
+        // 2. TRANSACTION: Run all updates as a single "all-or-nothing" block
+        // This is much safer than running individual Promise.all calls
+        await prisma.$transaction(
+            items.map((item) =>
+                prisma.property.update({
+                    where: { id: item.id },
+                    data: {
+                        order: item.order,
+                        isPinned: item.isPinned
+                    },
+                })
+            )
+        );
+
+        // 3. LOGGING: Track the movement in your logs
+        await logAction(`REORDER SUCCESS: ${items.length} properties rearranged via drag-drop.`);
+
+        // 4. REVALIDATE: Refresh the admin and public list caches
+        revalidatePath("/admin");
+        revalidatePath("/");
+
+    } catch (error) {
+        console.error("Failed to update property order:", error);
+        throw new Error("Failed to save property order.");
+    }
 }
