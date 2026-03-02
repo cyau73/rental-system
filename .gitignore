@@ -45,3 +45,5 @@ next-env.d.ts
 /public/uploads/
 
 logs.json
+
+.env.local
