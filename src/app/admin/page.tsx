@@ -1,3 +1,4 @@
+//app/admin/page.tsx
 import { auth } from "@/auth";
 import { addProperty } from "@/app/actions/properties";
 import AdminNav from "@/components/AdminNav";
@@ -17,7 +18,7 @@ export default async function AdminPage({
   searchParams: Promise<{ query?: string; status?: string }>;
 }) {
   const session = await auth();
-
+  // console.log("DEBUG SESSION:", JSON.stringify(session?.user));
   // 1. Authentication & Role Protection
   if (!session || !session.user) redirect("/login");
   // @ts-ignore
