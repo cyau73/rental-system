@@ -1,110 +1,104 @@
-import { signIn } from "@/auth";
+//app/page.tsx
+import prisma from "@/lib/prisma";
+import { auth, signOut } from "@/auth";
+import Link from "next/link";
+import SearchBar from "@/components/SearchBar";
+import ScrollToTop from "@/components/ScrollToTop";
+import PublicGalleryCard from "@/components/PublicGalleryCard";
 
-export default function LoginPage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ query?: string }>;
+}) {
+  const session = await auth();
+  const params = await searchParams;
+  const query = params.query;
+
+  const rawProperties = await prisma.property.findMany({
+    where: {
+      status: "AVAILABLE",
+      ...(query ? {
+        OR: [
+          { title: { contains: query, mode: "insensitive" } },
+          { address: { contains: query, mode: "insensitive" } },
+        ],
+      } : {}),
+    },
+    orderBy: [{ isPinned: 'desc' }, { order: 'asc' }],
+  });
+
+  const properties = rawProperties.map(prop => ({
+    ...prop,
+    images: Array.isArray(prop.images)
+      ? prop.images.filter((url: string) => url && url.trim() !== "")
+      : [],
+    rental: Number(prop.rental || 0),
+    rentalDuration: Number(prop.rentalDuration || 12),
+    createdAt: prop.createdAt.toISOString(),
+  }));
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-[2rem] shadow-xl border border-gray-100 p-10 text-center">
-        <div className="mb-8">
-          <span className="text-4xl">🏠</span>
-          <h1 className="text-2xl font-extrabold text-gray-900 mt-4 tracking-tight">
-            Rental Management
-          </h1>
-          <p className="text-sm text-gray-400 mt-2">
-            Please sign in to access your dashboard.
-          </p>
-        </div>
+    <div className="min-h-screen bg-gray-50 pb-20">
+      {/* NAV SECTION */}
+      <nav className="flex items-center justify-between bg-white border-b px-8 py-4 shadow-sm sticky top-0 z-50">
+        <Link href="/" className="flex items-center gap-3 group">
+          <img src="/icon.png" alt="Logo" className="w-10 h-10 object-contain" />
+          <h1 className="text-xl md:text-2xl font-extrabold text-gray-900 tracking-tight">Rental Management</h1>
+        </Link>
 
-        <form
-          action={async () => {
-            "use server";
-            await signIn("google", { redirectTo: "/admin" });
-          }}
-        >
-          <button
-            type="submit"
-            className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 px-6 rounded-xl transition-all active:scale-95 shadow-sm"
-          >
-            <img
-              src="https://authjs.dev/img/providers/google.svg"
-              alt="Google"
-              className="w-5 h-5"
-            />
-            <span className="text-[12px] uppercase tracking-widest">Sign in with Google</span>
-          </button>
-        </form>
-      </div>
+        <div className="flex items-center gap-6">
+          {session?.user ? (
+            <div className="flex items-center gap-6">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold text-gray-900 leading-none">{session.user.name}</p>
+                <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">{session.user.email}</p>
+              </div>
+              <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
+                <button type="submit" className="text-[10px] font-bold uppercase tracking-widest text-red-600 hover:bg-red-50 px-5 py-2.5 rounded-xl border border-red-100 transition-all active:scale-95">
+                  Logout
+                </button>
+              </form>
+            </div>
+          ) : (
+            <Link href="/login" className="text-[10px] font-bold uppercase text-blue-600 px-5 py-2.5 border border-blue-100 rounded-xl hover:bg-blue-50 transition-all">
+              Staff Login
+            </Link>
+          )}
+        </div>
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-4 md:px-10 pt-10">
+        <header className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Available Rentals</h2>
+            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">Direct from May Properties</p>
+          </div>
+          <div className="w-full md:w-80">
+            <SearchBar />
+          </div>
+        </header>
+
+        {/* PROPERTY LIST WITH EMPTY STATE CHECK */}
+        {properties.length === 0 ? (
+          <div className="text-center py-24 bg-white rounded-[2.5rem] border border-dashed border-gray-200 shadow-inner">
+            <div className="mb-4 text-4xl">🏘️</div>
+            <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-[10px]">
+              No rentals found matching "{query}"
+            </p>
+            <Link href="/" className="text-blue-600 text-[10px] uppercase tracking-widest font-black mt-6 inline-block hover:text-blue-700">
+              ← View All Properties
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            {properties.map((prop) => (
+              <PublicGalleryCard key={prop.id} prop={prop} />
+            ))}
+          </div>
+        )}
+      </main>
+      <ScrollToTop />
     </div>
   );
 }
-// import prisma from "@/lib/prisma";
-// import Image from "next/image";
-
-// export default async function Home() {
-//   const users = await prisma.user.findMany();
-//   return (
-//     // <div>
-//     //   <h1>Users</h1>
-//     //   <pre>{JSON.stringify(users, null, 2)}</pre>
-//     // </div>
-
-//     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-//       <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-//         <Image
-//           className="dark:invert"
-//           src="/next.svg"
-//           alt="Next.js logo"
-//           width={100}
-//           height={20}
-//           priority
-//         />
-//         <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-//           <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-//             To get started, edit the page.tsx file.
-//           </h1>
-//           <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-//             Looking for a starting point or more instructions? Head over to{" "}
-//             <a
-//               href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//               className="font-medium text-zinc-950 dark:text-zinc-50"
-//             >
-//               Templates
-//             </a>{" "}
-//             or the{" "}
-//             <a
-//               href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//               className="font-medium text-zinc-950 dark:text-zinc-50"
-//             >
-//               Learning
-//             </a>{" "}
-//             center.
-//           </p>
-//         </div>
-//         <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-//           <a
-//             className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-//             href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//             target="_blank"
-//             rel="noopener noreferrer"
-//           >
-//             <Image
-//               className="dark:invert"
-//               src="/vercel.svg"
-//               alt="Vercel logomark"
-//               width={16}
-//               height={16}
-//             />
-//             Deploy Now
-//           </a>
-//           <a
-//             className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-//             href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//             target="_blank"
-//             rel="noopener noreferrer"
-//           >
-//             Documentation
-//           </a>
-//         </div>
-//       </main>
-//     </div>
-//   );
-// }
