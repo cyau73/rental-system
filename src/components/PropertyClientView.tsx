@@ -58,32 +58,7 @@ export default function PropertyClientView({
 
     return (
         <div className={`min-h-screen bg-gray-50 pb-20 transition-opacity duration-700 ease-in ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-            <nav className="flex items-center justify-between bg-white border-b px-8 py-4 shadow-sm sticky top-0 z-50">
-                <Link href="/" className="flex items-center gap-3 group">
-                    <img src="/icon.png" alt="Logo" className="w-10 h-10 object-contain" />
-                    <h1 className="text-xl md:text-2xl font-extrabold text-gray-900 tracking-tight">Rental Management</h1>
-                </Link>
-
-                <div className="flex items-center gap-6">
-                    {session?.user ? (
-                        <div className="flex items-center gap-6">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-sm font-bold text-gray-900 leading-none">{session.user.name}</p>
-                                <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">{session.user.email}</p>
-                            </div>
-                            <button onClick={() => signOut({ callbackUrl: "/" })} className="text-[10px] font-bold uppercase tracking-widest text-red-600 hover:bg-red-50 px-5 py-2.5 rounded-xl border border-red-100 transition-all">
-                                Logout
-                            </button>
-                        </div>
-                    ) : (
-                        <Link href="/login" className="text-[10px] font-bold uppercase text-blue-600 px-5 py-2.5 border border-blue-100 rounded-xl hover:bg-blue-50">
-                            Staff Login
-                        </Link>
-                    )}
-                </div>
-            </nav>
-
-            <main className="max-w-7xl mx-auto px-4 md:px-10 pt-10">
+            <main className="max-w-7xl mx-auto px-2 md:px-5 pt-5">
                 <header className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
                         <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Available Rentals</h2>
