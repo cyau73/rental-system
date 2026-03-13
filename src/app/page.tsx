@@ -1,5 +1,4 @@
 //app/page.tsx
-// app/page.tsx
 import prisma from "@/lib/prisma";
 import { auth } from "@/auth";
 import PropertyClientView from "@/components/PropertyClientView";
@@ -46,21 +45,25 @@ export default async function HomePage({
   }));
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 flex flex-col items-center">
       {/* 1. ADMIN BAR - Only appears if logged in */}
       {session?.user && (
         <AdminNav user={session.user} />
       )}
 
-      {/* 2. WELCOME HERO */}
-      <Welcome />
+      {/* 
+          2. UNIFIED CONTENT WRAPPER 
+          MATCHING YOUR FOOTER: max-w-7xl, mx-auto, px-6
+      */}
+      <div className="w-full max-w-7xl mx-auto px-6 flex flex-col gap-0">
+        <Welcome />
 
-      {/* 3. PUBLIC VIEW */}
-      <PropertyClientView
-        initialProperties={properties}
-        session={session}
-        query={query}
-      />
+        <PropertyClientView
+          initialProperties={properties}
+          session={session}
+          query={query}
+        />
+      </div>
 
       <Footer />
     </main>

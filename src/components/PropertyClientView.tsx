@@ -58,7 +58,7 @@ export default function PropertyClientView({
 
     return (
         <div className={`min-h-screen bg-gray-50 pb-20 transition-opacity duration-700 ease-in ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-            <main className="max-w-7xl mx-auto px-2 md:px-5 pt-5">
+            <main className="max-w-7xl mx-auto px-2 md:px-5 pt-1">
                 <header className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
                         <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Available Rentals</h2>
