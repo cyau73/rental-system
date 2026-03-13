@@ -3,8 +3,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
+import Lightbox from "@/components/LightBox";
 
-export default function PublicGalleryCard({ prop }: { prop: any }) {
+export default function PublicGalleryCard({
+    prop,
+    layoutCols
+}: {
+    prop: any;
+    layoutCols: number
+}) {
     const [currentIdx, setCurrentIdx] = useState(0);
     const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
@@ -23,12 +30,31 @@ export default function PublicGalleryCard({ prop }: { prop: any }) {
         setCurrentIdx((prev) => (prev - 1 + images.length) % images.length);
     }, [images.length]);
 
+    // 1. Dynamic classes for the outer container
+    // If 1x1, use flex-row on tablets/desktops. Otherwise, stay flex-col.
+    const containerClasses = layoutCols === 1
+        ? "flex flex-col md:flex-row min-h-[400px]"
+        : "flex flex-col h-full";
+
+    // 2. Dynamic classes for the image section
+    const imageWrapperClasses = {
+        1: "w-full md:w-3/5 h-64 md:h-auto", // Horizontal 1x1
+        // 2x2: We use h-48 on small screens and h-64 on iPad to keep it tight
+        2: "w-full h-48 md:h-64 lg:h-72",
+        3: "w-full h-40 md:h-48",             // 3x3: Very compact
+    }[layoutCols];
+
+    // 2. DYNAMIC PADDING LOGIC
+    // Reduce padding on 2x2 and 3x3 to save vertical space
+    const contentPadding = layoutCols === 1 ? "p-8" : "p-4 md:p-5";
+
     return (
         <>
-            <div className="bg-white rounded-[2rem] overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full">
+            <div className={`bg-white rounded-[2rem] overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-500 ${layoutCols === 1 ? "flex flex-col md:flex-row min-h-[350px]" : "flex flex-col h-full"
+                }`}>
 
                 {/* IMAGE SECTION */}
-                <div className="relative h-72 bg-gray-100 group shrink-0 overflow-hidden">
+                <div className={`relative bg-gray-100 group shrink-0 overflow-hidden ${imageWrapperClasses}`}>
                     <Image
                         src={images[currentIdx] || "/placeholder-house.jpg"}
                         alt={prop.title}
@@ -67,46 +93,45 @@ export default function PublicGalleryCard({ prop }: { prop: any }) {
                         </div>
                     </div>
 
-                    {/* 3. PRICE TAG - LOWER Z-INDEX (z-10) */}
+                    {/* 3. PRICE TAG - LOWER Z-INDEX (z-10) 
                     <div className="absolute top-4 right-4 bg-white/95 backdrop-blur px-4 py-1.5 rounded-xl shadow-sm border border-gray-100 z-10">
                         <p className="text-sm font-black text-blue-600">${prop.rental.toLocaleString()}</p>
                     </div>
+                    */}
                 </div>
 
                 {/* CONTENT SECTION */}
-                <div className="p-6 flex flex-col flex-grow">
-                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight line-clamp-1">{prop.title}</h3>
-                    <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-4 italic line-clamp-1">{prop.address}</p>
-
-                    <div className="grid grid-cols-2 gap-4 py-4 border-t border-gray-100 mt-auto">
+                <div className={`${contentPadding} flex flex-col justify-center flex-grow`}>                    <div>
+                    <h3 className={`${layoutCols === 1 ? 'text-2xl' : 'text-lg'} font-extrabold text-gray-900 tracking-tight line-clamp-1`}>
+                        {prop.title}
+                    </h3>
+                    <p className={`${layoutCols === 1 ? 'text-l' : 'text-md'}  uppercase text-gray-500 tracking-tight italic line-clamp-1`}>
+                        {prop.address}
+                    </p>
+                    <p className={`${layoutCols === 1 ? 'text-xl' : 'text-md'}   font-extrabold text-base text-blue-700 uppercase tracking-tight line-clamp-1`}>${Number(prop.rental || 0).toLocaleString()}</p>
+                </div>
+                    {/* Grid info - larger gap for 1x1 */}
+                    <div className="grid grid-cols-2 gap-4 py-3 border-t border-gray-100 mt-auto">
                         <div>
-                            <p className="text-[9px] font-bold text-gray-400 uppercase">Term</p>
-                            <p className="text-sm font-bold text-gray-900">{prop.rentalDuration} Mo.</p>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Term</p>
+                            <p className="md:text-xs font-bold text-gray-900">{prop.rentalDuration} Months</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-[9px] font-bold text-gray-400 uppercase">Status</p>
-                            <p className="text-sm font-bold text-green-600">Available</p>
+                            <p className="md:text-xs font-bold text-gray-400 uppercase tracking-wider">Status</p>
+                            <p className="text-xs md:text-sm font-bold text-green-600">Available</p>
                         </div>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* LIGHTBOX MODAL */}
             {previewIndex !== null && (
-                <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md animate-in fade-in duration-200"
-                    onClick={() => setPreviewIndex(null)}
-                >
-                    <button className="absolute top-6 right-6 text-white text-4xl">&times;</button>
-                    <div className="relative max-w-5xl max-h-[85vh] w-full h-full flex flex-col items-center justify-center p-4">
-                        <img
-                            src={images[previewIndex] || "/placeholder-house.jpg"}
-                            alt="Preview"
-                            className="max-w-full max-h-full object-contain rounded-lg"
-                            onClick={(e) => e.stopPropagation()}
-                        />
-                    </div>
-                </div>
+                <Lightbox
+                    images={images}
+                    currentIndex={previewIndex}
+                    onClose={() => setPreviewIndex(null)}
+                    onNavigate={(index) => setPreviewIndex(index)}
+                />
             )}
         </>
     );

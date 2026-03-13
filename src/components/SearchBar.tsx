@@ -1,45 +1,80 @@
+//components/SearchBar.tsx
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useTransition } from "react";
+import { useTransition, useState, useEffect } from "react";
 
 export default function SearchBar() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const pathname = usePathname(); // 1. Grab the current path
+    const pathname = usePathname();
     const [isPending, startTransition] = useTransition();
 
-    function handleSearch(term: string) {
+    const [inputValue, setInputValue] = useState(searchParams.get("query") || "");
+
+    // Debounce effect for typing
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            // Only update if the value is actually different from the URL
+            if (inputValue !== (searchParams.get("query") || "")) {
+                updateUrl(inputValue);
+            }
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [inputValue]);
+
+    // Reusable function to push URL changes
+    const updateUrl = (value: string) => {
         const params = new URLSearchParams(searchParams);
-        if (term) {
-            params.set("query", term);
+        if (value) {
+            params.set("query", value);
         } else {
             params.delete("query");
         }
 
         startTransition(() => {
-            // 2. Use pathname instead of "/admin"
             router.push(`${pathname}?${params.toString()}`);
         });
-    }
+    };
+
+    // Instant clear function
+    const handleClear = () => {
+        setInputValue("");
+        updateUrl("");
+    };
 
     return (
         <div className="relative w-full md:w-72 group">
+            {/* Search Icon */}
+            <span className="absolute left-3 top-3.5 text-gray-400 font-extrabold z-10">
+                🔍
+            </span>
+
             <input
                 type="text"
                 placeholder="Search address..."
-                defaultValue={searchParams.get("query")?.toString()}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="w-full border border-gray-100 p-3 pl-10 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm text-black font-bold placeholder:text-gray-400 bg-white shadow-sm transition-all group-hover:border-gray-300"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                className="w-full border border-gray-100 p-3 pl-10 pr-10 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm text-black font-bold placeholder:text-gray-400 bg-white shadow-sm transition-all group-hover:border-gray-300"
             />
-            <span className="absolute left-3 top-3.5 text-black font-extrabold grayscale group-hover:grayscale-0 transition-all">
-                🔍
-            </span>
-            {isPending && (
-                <div className="absolute right-3 top-4">
-                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                </div>
-            )}
+
+            {/* Right-side Icons (Loading Spinner OR Clear Button) */}
+            <div className="absolute right-3 top-3 flex items-center gap-2">
+                {isPending ? (
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mt-0.5" />
+                ) : (
+                    inputValue && (
+                        <button
+                            onClick={handleClear}
+                            className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors text-xs font-bold"
+                            title="Clear search"
+                        >
+                            ✕
+                        </button>
+                    )
+                )}
+            </div>
         </div>
     );
 }

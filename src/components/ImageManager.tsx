@@ -19,6 +19,7 @@ import {
     useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import Lightbox from "@/components/LightBox";
 
 // --- Sub-component: SortableImage ---
 function SortableImage({
@@ -253,40 +254,12 @@ export default function ImageManager({ initialImages, propertyId }: { initialIma
             )}
 
             {previewIndex !== null && (
-                <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md"
-                    onClick={() => setPreviewIndex(null)}
-                >
-                    <button type="button" className="absolute top-6 right-6 text-white/70 hover:text-white text-4xl">×</button>
-
-                    <button
-                        type="button"
-                        onClick={showPrev}
-                        className="absolute left-4 md:left-10 p-4 text-white/50 hover:text-white bg-white/5 rounded-full hover:bg-white/10"
-                    >
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-                    </button>
-
-                    <div className="relative max-w-5xl max-h-[85vh] w-full h-full flex flex-col items-center justify-center p-4">
-                        <img
-                            src={images[previewIndex]}
-                            alt="Preview"
-                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                            onClick={(e) => e.stopPropagation()}
-                        />
-                        <div className="absolute -bottom-10 bg-white/10 px-4 py-1 rounded-full text-white/80 text-xs border border-white/10">
-                            {previewIndex + 1} / {images.length}
-                        </div>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={showNext}
-                        className="absolute right-4 md:right-10 p-4 text-white/50 hover:text-white bg-white/5 rounded-full hover:bg-white/10"
-                    >
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-                    </button>
-                </div>
+                <Lightbox
+                    images={images}
+                    currentIndex={previewIndex}
+                    onClose={() => setPreviewIndex(null)}
+                    onNavigate={(index) => setPreviewIndex(index)}
+                />
             )}
         </div>
     );
