@@ -59,7 +59,9 @@ export default function PublicGalleryCard({
                         src={images[currentIdx] || "/placeholder-house.jpg"}
                         alt={prop.title}
                         fill
-                        className="object-cover transition-transform duration-700 group-hover:scale-105"
+                        priority={true}
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
 
                     {/* 1. NAVIGATION ARROWS - HIGHEST Z-INDEX (z-30) */}

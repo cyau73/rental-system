@@ -1,61 +1,48 @@
 // components/AdminNav.tsx
 "use client";
 
-import { handleLogout } from "@/app/actions"; // Import the server action
+import { User } from "next-auth";
+import { signOut } from "next-auth/react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 
-export default function AdminNav({ user }: { user: any }) {
-  const pathname = usePathname();
-
+export default function AdminNav({ user }: { user: User }) {
   return (
-    <nav className="flex items-center justify-between bg-white border-b px-8 py-4 shadow-sm">
-      <div className="flex items-center gap-4">
-        {/* LOGO AND LINKS (Keep existing logic) */}
-        <Link href="/admin" className="flex items-center gap-3 group">
-          <img src="/icon.png" alt="Logo" className="w-10 h-10 object-contain" />
-          <h1 className="text-2xl font-extrabold text-gray-900">Rental Management System</h1>
-        </Link>
-        <div className="hidden md:flex items-center gap-1">
-          <NavLink href="/admin" label="Property Listing" isActive={pathname === "/admin"} />
-          <NavLink href="/admin/reports" label="Reports" isActive={pathname === "/admin/reports"} />
-        </div>
-      </div>
+    /* 
+       The outer <nav> handles the full-width background and bottom border.
+       The inner <div> handles the alignment to match the rest of the site.
+    */
+    <nav className="w-full bg-white border-b border-gray-100 font-[family-name:var(--font-geist-sans)]">
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
-      <div className="flex items-center gap-6">
-        <div className="text-right hidden sm:block">
-          <p className="text-sm font-bold text-gray-900 leading-none">{user.name}</p>
-          <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">{user.email}</p>
+        {/* Left Side: Brand/Title */}
+        <div className="flex items-center gap-4">
+          <div className="bg-blue-600 text-white p-1.5 rounded-lg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="3" y1="9" x2="21" y2="9"></line>
+              <line x1="9" y1="21" x2="9" y2="9"></line>
+            </svg>
+          </div>
+          <span className="text-xs font-bold uppercase tracking-widest text-gray-900">
+            Admin Dashboard
+          </span>
         </div>
 
-        {/* UPDATED: Calling the external Server Action */}
-        <form action={handleLogout}>
+        {/* Right Side: User Info & Logout */}
+        <div className="flex items-center gap-6">
+          <div className="hidden md:flex flex-col items-end">
+            <span className="text-[10px] font-bold text-gray-900 uppercase">{user.name}</span>
+            <span className="text-[8px] text-gray-400 uppercase tracking-tighter">{user.email}</span>
+          </div>
           <button
-            type="submit"
-            className="text-[10px] font-bold uppercase tracking-widest text-red-600 hover:bg-red-50 px-5 py-2.5 rounded-xl border border-red-100 transition-all active:scale-95"
+            onClick={() => signOut()}
+            className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
           >
             Logout
           </button>
-        </form>
+        </div>
+
       </div>
     </nav>
-  );
-}
-
-// NavLink helper (Keep existing logic)
-function NavLink({ href, label, isActive }: { href: string; label: string; isActive?: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors relative ${isActive ? "text-gray-900" : "text-gray-400"
-        }`}
-    >
-      {label}
-      {isActive && (
-        <span className="absolute -top-1 -right-1 flex h-2 w-2">
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-        </span>
-      )}
-    </Link>
   );
 }

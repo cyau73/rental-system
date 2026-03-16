@@ -55,7 +55,7 @@ export default async function HomePage({
           2. UNIFIED CONTENT WRAPPER 
           MATCHING YOUR FOOTER: max-w-7xl, mx-auto, px-6
       */}
-      <div className="w-full max-w-7xl mx-auto px-6 flex flex-col gap-0">
+      <div className="w-full max-w-7xl mx-auto px-6">
         <Welcome />
 
         <PropertyClientView

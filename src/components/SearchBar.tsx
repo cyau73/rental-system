@@ -56,7 +56,7 @@ export default function SearchBar() {
                 placeholder="Search address..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                className="w-full border border-gray-100 p-3 pl-10 pr-10 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm text-black font-bold placeholder:text-gray-400 bg-white shadow-sm transition-all group-hover:border-gray-300"
+                className="w-full border border-gray-100 py-3 pl-10 pr-0 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm text-black font-bold placeholder:text-gray-400 bg-white shadow-sm transition-all group-hover:border-gray-300"
             />
 
             {/* Right-side Icons (Loading Spinner OR Clear Button) */}

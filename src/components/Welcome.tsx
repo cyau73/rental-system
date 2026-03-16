@@ -1,11 +1,31 @@
 //componets/Welcome.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Welcome() {
     // State to track if the section is open or closed
     const [isOpen, setIsOpen] = useState(true);
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    // 1. On mount, check if the user previously closed the section
+    useEffect(() => {
+        const savedState = localStorage.getItem("welcomeSectionOpen");
+        if (savedState !== null) {
+            setIsOpen(savedState === "true");
+        }
+        setIsLoaded(true); // Prevents layout flickers during hydration
+    }, []);
+
+    // 2. Wrap the toggle function to save the choice
+    const toggleSection = () => {
+        const newState = !isOpen;
+        setIsOpen(newState);
+        localStorage.setItem("welcomeSectionOpen", String(newState));
+    };
+
+    // Prevent rendering until we know the saved state to avoid "flickering"
+    if (!isLoaded) return null;
 
     return (
         /* 
@@ -18,7 +38,7 @@ export default function Welcome() {
             ? "min-h-[40vh] pt-2 px-2 pb-1 sm:pt-5 sm:px-5 sm:pb-1"
             : "min-h-0 pt-4 px-4 pb-0"
             }`}>
-            <div className={`max-w-4xl w-full flex flex-col gap-1 overflow-hidden transition-all duration-500 ${isOpen ? "opacity-100 max-h-[1000px]" : "opacity-0 max-h-0"}`}>
+            <div className={`w-full flex flex-col gap-1 overflow-hidden transition-all duration-500 ${isOpen ? "opacity-100 max-h-[1000px]" : "opacity-0 max-h-0"}`}>
                 {/* Responsive Text: Consistent with public page.tsx scaling */}
                 <h1 className="text-center text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900">
                     Welcome to<br />
@@ -27,8 +47,8 @@ export default function Welcome() {
                     </span>
                 </h1>
 
-                <p className="text-lg sm:text-xl text-gray-600 leading-relaxed max-w-2xl mx-auto">
-                    We are a privately owned investment firm specializing in the long-term stewardship of residential and commercial real estate properties. Browse our exclusive portfolio and rest assured that all prospects and property agents will be dealing directly with the owners.
+                <p className="text-lg sm:text-xl text-gray-600 leading-relaxed mx-auto">
+                    We are a privately owned property investment company specializing in the long-term stewardship of residential and commercial real estate properties. Please browse our exclusive portfolio and all prospects and property agents will deal with us directly.
                 </p>
 
                 {/* 
@@ -78,21 +98,36 @@ export default function Welcome() {
                     </div>
                 </div>
             </div>
-            {/* Toggle Button with Up/Down Arrow */}
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="mb-2 p-2 rounded-full hover:bg-gray-100 transition-colors flex items-center gap-2 group"
-            >
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 group-hover:text-gray-600">
-                    {isOpen ? "Close Info Section" : "Open Info Section"}
+            <div className="w-full flex justify-center mb-6 relative group">
+
+                {/* Tooltip text: Hidden by default (scale-0), appears on hover (scale-100) */}
+                <span className="absolute -top-10 scale-0 group-hover:scale-100 transition-all duration-200 bg-gray-900 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg shadow-lg pointer-events-none">
+                    {isOpen ? "Close Section" : "Open Section"}
                 </span>
-                {/* Arrow rotates 180 degrees based on state */}
-                <div className={`transition-transform duration-300 ${isOpen ? "rotate-0" : "rotate-180"}`}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="18 15 12 9 6 15"></polyline>
-                    </svg>
-                </div>
-            </button>
+
+                {/* Circle Button */}
+                <button
+                    onClick={toggleSection}
+                    className="w-12 h-12 rounded-full bg-white border-2 border-gray-100 shadow-sm flex items-center justify-center hover:border-gray-300 hover:bg-gray-50 transition-all duration-300"
+                >
+                    {/* SVG: Kept at stroke-3.5 and text-gray-900 for iPad visibility */}
+                    <div className={`transition-transform duration-500 ${isOpen ? "rotate-0" : "rotate-180"}`}>
+                        <svg
+                            width="22"
+                            height="22"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="3.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="text-gray-900"
+                        >
+                            <polyline points="18 15 12 9 6 15"></polyline>
+                        </svg>
+                    </div>
+                </button>
+            </div>
 
         </section>
     );
