@@ -105,7 +105,7 @@ export default function PublicGalleryCard({
                     <h3 className={`${layoutCols === 1 ? 'text-2xl' : 'text-lg'} font-extrabold text-gray-900 tracking-tight line-clamp-1`}>
                         {prop.title}
                     </h3>
-                    <p className={`${layoutCols === 1 ? 'text-l' : 'text-md'}  uppercase text-gray-500 tracking-tight italic line-clamp-1`}>
+                    <p className={`${layoutCols === 1 ? 'text-l' : 'text-md'} text-gray-500 tracking-tight italic line-clamp-1`}>
                         {prop.address}
                     </p>
                     <p className={`${layoutCols === 1 ? 'text-xl' : 'text-md'}   font-extrabold text-base text-blue-700 uppercase tracking-tight line-clamp-1`}>${Number(prop.rental || 0).toLocaleString()}</p>
