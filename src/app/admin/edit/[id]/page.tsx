@@ -8,6 +8,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import prisma from "@/lib/prisma";
+import Tenant from "@/components/Tenant";
 
 export default async function EditPropertyPage({
     params,
@@ -23,6 +24,7 @@ export default async function EditPropertyPage({
 
     const property = await prisma.property.findUnique({
         where: { id },
+        include: { tenants: { orderBy: { createdAt: "desc" } } } // Include tenants in the query   
     });
 
     if (!property) notFound();
@@ -133,7 +135,17 @@ export default async function EditPropertyPage({
                         />
                     </section>
 
-                    {/* 3. SUBMIT SECTION */}
+                    {/* 3. TENANT SECTION */}
+                    <section className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-200">
+                        <div className="mb-6">
+                            <h2 className="text-lg font-bold text-gray-900">Tenants</h2>
+                            <p className="text-sm text-gray-500">View tenant details. Add new tenants from the dashboard.</p>
+                        </div>
+
+                        <Tenant tenants={property.tenants} />
+                    </section>
+
+                    {/* 4. SUBMIT SECTION */}
                     <div className="flex flex-col sm:flex-row gap-4">
                         <div className="flex-1">
                             <SubmitButton label="Update Property" />
