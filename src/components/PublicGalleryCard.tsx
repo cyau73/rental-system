@@ -54,14 +54,12 @@ export default function PublicGalleryCard({
                 }`}>
 
                 {/* IMAGE SECTION */}
-                <div className={`relative bg-gray-100 group shrink-0 overflow-hidden ${imageWrapperClasses}`}>
+                <div className={`relative w-full h-64 bg-gray-100 group shrink-0 overflow-hidden ${imageWrapperClasses}`}>
                     <Image
                         src={images[currentIdx] || "/placeholder-house.jpg"}
                         alt={prop.title}
                         fill
-                        priority={true}
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
 
                     {/* 1. NAVIGATION ARROWS - HIGHEST Z-INDEX (z-30) */}

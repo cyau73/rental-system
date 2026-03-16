@@ -1,34 +1,63 @@
 // components/AdminNav.tsx
 "use client";
 
+import { useState, useEffect, useRef } from "react"
 import { User } from "next-auth";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 
 export default function AdminNav({ user }: { user: User }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
+
+  // FIX: Close menu when clicking outside of the navigation component
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (navRef.current && !navRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    // Bind the event listener
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    // Clean up the listener
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen]);
+
   return (
-    /* 
-       The outer <nav> handles the full-width background and bottom border.
-       The inner <div> handles the alignment to match the rest of the site.
-    */
-    <nav className="w-full bg-white border-b border-gray-100 font-[family-name:var(--font-geist-sans)]">
+    <nav
+      ref={navRef}
+      className="w-full bg-white border-b border-gray-100 font-[family-name:var(--font-geist-sans)] relative z-50">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
-        {/* Left Side: Brand/Title */}
+        {/* Left Side: Brand & Hamburger Toggle */}
         <div className="flex items-center gap-4">
-          <div className="bg-blue-600 text-white p-1.5 rounded-lg">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="3" y1="9" x2="21" y2="9"></line>
-              <line x1="9" y1="21" x2="9" y2="9"></line>
+          {/* Hamburger/X Button: Toggles the menu state */}
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="p-2 -ml-2 hover:bg-gray-50 rounded-lg transition-colors text-gray-600"
+            aria-label="Toggle Menu"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {isOpen ? (
+                <path d="M18 6L6 18M6 6l12 12" /> // X Icon
+              ) : (
+                <path d="M4 6h16M4 12h16M4 18h16" /> // Hamburger Icon
+              )}
             </svg>
-          </div>
-          <span className="text-xs font-bold uppercase tracking-widest text-gray-900">
+          </button>
+
+          <span className="text-xs font-bold uppercase tracking-widest text-gray-900 hidden sm:inline">
             Admin Dashboard
           </span>
         </div>
 
-        {/* Right Side: User Info & Logout */}
+        {/* Right Side: User Info & Logout (Matches horizontal alignment px-6) */}
         <div className="flex items-center gap-6">
           <div className="hidden md:flex flex-col items-end">
             <span className="text-[10px] font-bold text-gray-900 uppercase">{user.name}</span>
@@ -41,8 +70,44 @@ export default function AdminNav({ user }: { user: User }) {
             Logout
           </button>
         </div>
-
       </div>
-    </nav>
+
+      {/* DROPDOWN MENU */}
+      {isOpen && (
+        <div className="absolute top-16 left-0 w-full bg-white border-b border-gray-100 shadow-xl animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col gap-1">
+            <Link
+              href="/"
+              onClick={() => setIsOpen(false)} // Closes when a link is clicked
+              className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-600 hover:bg-gray-50 hover:text-blue-600 rounded-xl transition-all"
+            >
+              Home
+            </Link>
+            <Link
+              href="/admin"
+              onClick={() => setIsOpen(false)} // Closes when a link is clicked
+              className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-600 hover:bg-gray-50 hover:text-blue-600 rounded-xl transition-all"
+            >
+              Property
+            </Link>
+            <Link
+              href="/admin/reports"
+              onClick={() => setIsOpen(false)}
+              className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-600 hover:bg-gray-50 hover:text-blue-600 rounded-xl transition-all"
+            >
+              Reports
+            </Link>
+            <Link
+              href="/admin/users"
+              onClick={() => setIsOpen(false)}
+              className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-600 hover:bg-gray-50 hover:text-blue-600 rounded-xl transition-all"
+            >
+              Users
+            </Link>
+          </div >
+        </div >
+      )
+      }
+    </nav >
   );
 }
