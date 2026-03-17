@@ -80,10 +80,11 @@ model Tenant {
   address         String 
   mobile          String 
   email           String 
-  rentalAmount    Decimal 
-  startDate       DateTime 
-  securityDeposit Decimal 
-  utilityDeposit  Decimal 
+  rentalAmount    Decimal? 
+  startDate       DateTime? 
+  endDate         DateTime? 
+  securityDeposit Decimal? 
+  utilityDeposit  Decimal? 
   property        Property @relation(fields: [propertyId], references: [id]) 
   propertyId      String 
   createdAt       DateTime @default(now()) 

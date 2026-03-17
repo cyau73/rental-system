@@ -107,6 +107,7 @@ export default function ImageManager({ initialImages, propertyId }: { initialIma
     const [previewIndex, setPreviewIndex] = useState<number | null>(null);
     const [showUndo, setShowUndo] = useState(false);
     const [lastDeleted, setLastDeleted] = useState<{ url: string; index: number } | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -130,6 +131,7 @@ export default function ImageManager({ initialImages, propertyId }: { initialIma
     }, [previewIndex, images.length]);
 
     useEffect(() => {
+        setIsMounted(true);
         const handleKeyDown = (e: KeyboardEvent) => {
             if (previewIndex === null) return;
             if (e.key === "ArrowRight") showNext();
@@ -194,6 +196,17 @@ export default function ImageManager({ initialImages, propertyId }: { initialIma
             setLastDeleted(null);
         }
     };
+
+    // If we aren't mounted yet, render a simplified "skeleton" or static version
+    if (!isMounted) {
+        return (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-pulse">
+                {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="aspect-square bg-gray-100 rounded-2xl" />
+                ))}
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 relative">
