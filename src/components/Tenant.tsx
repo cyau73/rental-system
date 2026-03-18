@@ -4,6 +4,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from 'next/navigation';
+import {
+    formatCurrency,
+    isValidNumber,
+    formatMobile,
+    stripCommasAndDashes,
+    copyToClipboard
+} from "@/lib/formatters";
 
 export default function Tenant({ tenants = [], propertyId }: { tenants: any[], propertyId: string }) {
     const router = useRouter();
@@ -11,18 +18,46 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [visibleCount, setVisibleCount] = useState(3); // Increased default for better visibility
+    const [visibleCount, setVisibleCount] = useState(3);
     const [activePopover, setActivePopover] = useState<string | null>(null);
     const [showCheck, setShowCheck] = useState<string | null>(null);
 
-    // 1. Stable Silent Save Function
-    const handleSilentSave = useCallback(async (tenantId: string, container: Element) => {
-        const inputs = container.querySelectorAll('input[name]');
+    const handleCopy = async (text: string, id: string) => {
+        const success = await copyToClipboard(text);
+        if (success) {
+            setShowCheck(id);
+            setTimeout(() => setShowCheck(null), 2000);
+        }
+    };
+
+    const handleCurrencyInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        if (!isValidNumber(val)) return;
+        e.target.value = formatCurrency(val);
+    };
+
+    const handleMobileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const rawDigits = e.target.value.replace(/\D/g, "");
+        // Malaysia: Allow up to 11 digits (e.g., 011-1234-5678)
+        if (rawDigits.length > 11) {
+            e.target.value = formatMobile(rawDigits.slice(0, 11));
+            return;
+        }
+        e.target.value = formatMobile(e.target.value);
+    };
+
+    const handleSilentSave = useCallback(async (tenantId: string) => {
+        const container = document.querySelector(`.edit-container[data-tenant-id="${tenantId}"]`);
+        if (!container) return;
+
+        const inputs = container.querySelectorAll('input');
         const data: any = {};
 
         inputs.forEach(input => {
-            const isMoney = ['rentalAmount', 'securityDeposit', 'utilityDeposit'].includes(input.name);
-            data[input.name] = isMoney ? stripCommas(input.value) : input.value;
+            const name = input.getAttribute('name');
+            if (!name) return;
+            const isMoneyOrMobile = ['rentalAmount', 'securityDeposit', 'utilityDeposit', 'mobile'].includes(name);
+            data[name] = isMoneyOrMobile ? stripCommasAndDashes(input.value) : input.value.trim();
         });
 
         try {
@@ -33,33 +68,32 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
             });
 
             if (response.ok) {
-                setShowCheck(tenantId);
-                // Optional: Uncomment below if you want the icons to update instantly
-                // router.refresh(); 
+                setShowCheck(null); // Clear any existing check first
+                setTimeout(() => setShowCheck(tenantId), 10);
                 setTimeout(() => setShowCheck(null), 2000);
+                router.refresh();
             }
         } catch (error) {
             console.error("Silent save failed", error);
         }
-    }, [propertyId]); // Removed router from deps to prevent effect re-runs
+    }, [propertyId, router]);
 
-    // 2. Updated Click Outside Logic
     useEffect(() => {
         setMounted(true);
         const handleClickOutside = async (event: MouseEvent) => {
             const target = event.target as Element;
             const isPopoverClick = target.closest('.contact-popover-container');
 
-            // NEW: Check if we are clicking the 'Save' button itself
-            const isSaveButtonClick = target.tagName === 'BUTTON' && target.textContent?.toLowerCase() === 'save';
+            // Only trigger if there is an active popover and we clicked outside
+            if (activePopover && !isPopoverClick) {
+                const currentId = activePopover; // Capture the ID locally
 
-            if (activePopover && !isPopoverClick && !isSaveButtonClick) {
-                const container = document.querySelector(`.edit-container[data-tenant-id="${activePopover}"]`);
-                if (container) {
-                    // Only save if it's not a direct button click (which has its own handler)
-                    await handleSilentSave(activePopover, container);
-                }
+                // 1. Close the UI immediately for a snappy feel
                 setActivePopover(null);
+
+                // 2. Trigger the save (the checkmark logic is inside this function)
+                // It will use the captured 'currentId' to show the checkmark
+                await handleSilentSave(currentId);
             }
         };
 
@@ -67,40 +101,31 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [activePopover, handleSilentSave]);
 
-    const formatCurrency = (val: any) => {
-        if (val === undefined || val === null || val === "") return "";
-        const num = val.toString().replace(/,/g, "");
-        return Number(num).toLocaleString('en-US');
-    };
-
-    const stripCommas = (val: string) => val.replace(/,/g, "");
-
-    const handleCurrencyInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const rawValue = stripCommas(e.target.value);
-        if (isNaN(Number(rawValue)) && rawValue !== "") return;
-        e.target.value = formatCurrency(rawValue);
-    };
-
     const handleSave = async (e: React.MouseEvent, tenantId?: string) => {
-        // Prevent double-triggering
         if (loading) return;
         setLoading(true);
 
         const container = e.currentTarget.closest(tenantId ? '.edit-container' : '.tenant-form-container');
         if (!container) return;
 
-        // This grabs ALL inputs in the row AND the popover inside it
+        // 1. Get the existing tenant object if editing
+        const existingTenant = tenants.find(t => t.id === tenantId) || {};
+
         const inputs = container.querySelectorAll('input');
-        const data: any = {};
+        const data: any = { ...existingTenant };
 
         inputs.forEach(input => {
+            const name = input.getAttribute('name');
+            if (!name) return;
+
             const val = input.value.trim();
-            if (['rentalAmount', 'securityDeposit', 'utilityDeposit'].includes(input.name)) {
-                const cleanNum = stripCommas(val);
-                data[input.name] = cleanNum === "" ? null : parseFloat(cleanNum);
+            if (['rentalAmount', 'securityDeposit', 'utilityDeposit'].includes(name)) {
+                const cleanNum = stripCommasAndDashes(val);
+                data[name] = cleanNum === "" ? null : parseFloat(cleanNum);
+            } else if (name === 'mobile') {
+                data[name] = stripCommasAndDashes(val); // Ensure no dashes in DB
             } else {
-                // Force email/mobile to be empty strings if blank, never null
-                data[input.name] = val || "";
+                data[name] = val || "";
             }
         });
 
@@ -121,6 +146,9 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
                 if (!tenantId) {
                     setIsAddOpen(false);
                     inputs.forEach(i => i.value = "");
+                } else {
+                    setShowCheck(tenantId);
+                    setTimeout(() => setShowCheck(null), 2000);
                 }
             }
         } catch (error) {
@@ -152,13 +180,16 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
                     <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Tenant History</h3>
                 </div>
 
+                {/* Table Headers */}
                 <div className="hidden md:grid grid-cols-12 gap-4 px-6 mb-3">
                     <div className="col-span-3 text-[9px] font-black text-gray-400 uppercase">Tenant Name</div>
                     <div className="col-span-1 text-[9px] font-black text-gray-400 uppercase text-center">Contact</div>
                     <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase text-center">Rental</div>
                     <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase text-center">Deposits (S/U)</div>
                     <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase text-center">Tenancy Period</div>
-                    <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase text-center">Actions</div>
+                    <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase flex justify-center items-center">
+                        Actions
+                    </div>
                 </div>
 
                 <div className="space-y-2">
@@ -183,22 +214,24 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></svg>
                                             </button>
                                             {activePopover === tenant.id && (
-                                                <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-56 bg-white border border-gray-200 shadow-2xl rounded-[1.5rem] p-4 z-[100] animate-in fade-in zoom-in-95 duration-200">
+                                                <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-56 bg-white border border-gray-200 shadow-2xl rounded-[1.5rem] p-4 z-[100] animate-in fade-in zoom-in-95 duration-200" onMouseDown={(e) => e.stopPropagation()}>
                                                     <div className="flex flex-col gap-4">
                                                         <div className="flex flex-col gap-1">
-                                                            <label className="text-[9px] font-black uppercase text-blue-500 ml-1">Email Address</label>
-                                                            <input name="email"
-                                                                defaultValue={tenant.email || ""}
-                                                                autoComplete="email"
-                                                                placeholder="tenant@email.com"
-                                                                className="text-xs text-gray-900 font-bold border-b border-gray-100 bg-transparent py-1 outline-none focus:border-blue-400" />
+                                                            <label className="text-[9px] font-black uppercase text-blue-500 ml-1 flex justify-between">
+                                                                Email Address
+                                                                <button type="button" onClick={() => handleCopy(tenant.email || "", tenant.id)} className="text-[8px] text-gray-400 hover:text-blue-600">Copy</button>
+                                                            </label>
+                                                            <input name="email" defaultValue={tenant.email || ""} autoComplete="email" className="text-xs text-gray-900 font-bold border-b border-gray-100 bg-transparent py-1 outline-none focus:border-blue-400" />
                                                         </div>
                                                         <div className="flex flex-col gap-1">
-                                                            <label className="text-[9px] font-black uppercase text-emerald-500 ml-1">WhatsApp Number</label>
+                                                            <label className="text-[9px] font-black uppercase text-emerald-500 ml-1 flex justify-between">
+                                                                WhatsApp Number
+                                                                <button type="button" onClick={() => handleCopy(tenant.mobile || "", tenant.id)} className="text-[8px] text-gray-400 hover:text-emerald-600">Copy</button>
+                                                            </label>
                                                             <input name="mobile"
-                                                                defaultValue={tenant.mobile || ""}
+                                                                defaultValue={formatMobile(tenant.mobile || "")} onChange={handleMobileInput}
                                                                 autoComplete="tel"
-                                                                placeholder="60123456789"
+                                                                placeholder="01x-xxxx-xxxx"
                                                                 className="text-xs text-gray-900 font-bold border-b border-gray-100 bg-transparent py-1 outline-none focus:border-emerald-400" />
                                                         </div>
                                                     </div>
@@ -208,8 +241,18 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
                                         </div>
                                     ) : (
                                         <div className="flex items-center justify-center gap-3">
-                                            {tenant.email && <a href={`mailto:${tenant.email}`} title={tenant.email}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0078d4" strokeWidth="2.5"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg></a>}
-                                            {tenant.mobile && <a href={`https://wa.me/${tenant.mobile.replace(/\D/g, '')}`} target="_blank"><svg width="14" height="14" fill="#25D366" viewBox="0 0 16 16"><path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.06 3.973L0 16l4.104-1.076a7.863 7.863 0 0 0 3.885 1.02h.006c4.369 0 7.927-3.558 7.93-7.927a7.865 7.865 0 0 0-2.324-5.691z" /></svg></a>}
+                                            {tenant.email && (
+                                                <div className="flex items-center gap-1">
+                                                    <a href={`mailto:${tenant.email}`} title={tenant.email}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0078d4" strokeWidth="2.5"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg></a>
+                                                    <button onClick={() => handleCopy(tenant.email, tenant.id)} className="text-gray-300 hover:text-blue-600"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+                                                </div>
+                                            )}
+                                            {tenant.mobile && (
+                                                <div className="flex items-center gap-1">
+                                                    <a href={`https://wa.me/${tenant.mobile.replace(/\D/g, '')}`} target="_blank"><svg width="14" height="14" fill="#25D366" viewBox="0 0 16 16"><path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.06 3.973L0 16l4.104-1.076a7.863 7.863 0 0 0 3.885 1.02h.006c4.369 0 7.927-3.558 7.93-7.927a7.865 7.865 0 0 0-2.324-5.691z" /></svg></a>
+                                                    <button onClick={() => handleCopy(tenant.mobile, tenant.id)} className="text-gray-300 hover:text-emerald-600"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -228,8 +271,8 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
                                 <div className="col-span-2 text-center">
                                     {editingId === tenant.id ? (
                                         <div className="flex gap-2">
-                                            <input name="securityDeposit" defaultValue={formatCurrency(tenant.securityDeposit)} onChange={handleCurrencyInput} className="w-1/2 text-[10px] text-gray-900 border-b-2 border-blue-300 bg-transparent outline-none" placeholder="$1,000" />
-                                            <input name="utilityDeposit" defaultValue={formatCurrency(tenant.utilityDeposit)} onChange={handleCurrencyInput} className="w-1/2 text-[10px] text-gray-900 border-b-2 border-blue-300 bg-transparent outline-none" placeholder="$1,000" />
+                                            <input name="securityDeposit" defaultValue={formatCurrency(tenant.securityDeposit)} onChange={handleCurrencyInput} className="w-1/2 text-[10px] text-gray-900 border-b-2 border-blue-300 bg-transparent outline-none" placeholder="Security $" />
+                                            <input name="utilityDeposit" defaultValue={formatCurrency(tenant.utilityDeposit)} onChange={handleCurrencyInput} className="w-1/2 text-[10px] text-gray-900 border-b-2 border-blue-300 bg-transparent outline-none" placeholder="Utility $" />
                                         </div>
                                     ) : (
                                         <p className="text-[10px] font-bold text-gray-500">${formatCurrency(tenant.securityDeposit)} / ${formatCurrency(tenant.utilityDeposit)}</p>
@@ -251,24 +294,68 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
                                     )}
                                 </div>
 
-                                <div className="col-span-2 flex justify-end items-center gap-2 relative">
-                                    {showCheck === tenant.id && (
-                                        <div className="absolute -left-8 top-1/2 -translate-y-1/2 bg-emerald-500 text-white p-1 rounded-full shadow-lg animate-in zoom-in-50 fade-in duration-300">
-                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                                                <polyline points="20 6 9 17 4 12"></polyline>
-                                            </svg>
-                                        </div>
-                                    )}
+                                <div className="col-span-2 flex justify-center items-center gap-1 relative h-full">
+                                    {/* 1. The centered content (Now all Icons) */}
                                     {editingId === tenant.id ? (
-                                        <div className="flex gap-3">
-                                            <button onClick={(e) => handleSave(e, tenant.id)} className="text-[10px] font-extrabold text-green-600 hover:text-green-700 uppercase">Save</button>
-                                            <button onClick={() => { setEditingId(null); setActivePopover(null); }} className="text-[10px] font-extrabold text-gray-400 hover:text-gray-600 uppercase">Cancel</button>
+                                        <div className="flex items-center justify-center gap-1">
+                                            {/* Save Icon (Disk) */}
+                                            <button
+                                                onClick={(e) => handleSave(e, tenant.id)}
+                                                title="Save Changes"
+                                                className="h-9 w-9 flex items-center justify-center bg-gray-50 text-green-600 hover:bg-green-100 rounded-full transition-all border border-gray-100 shadow-sm"
+                                            >
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                                    <polyline points="17 21 17 13 7 13 7 21" />
+                                                    <polyline points="7 3 7 8 15 8" />
+                                                </svg>
+                                            </button>
+                                            {/* Cancel/Return Icon (Arrow) */}
+                                            <button
+                                                onClick={() => { setEditingId(null); setActivePopover(null); }}
+                                                title="Cancel"
+                                                className="h-9 w-9 flex items-center justify-center bg-gray-50 text-gray-400 hover:bg-gray-100 rounded-full transition-all border border-gray-100 shadow-sm">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M9 14 4 9l5-5" />
+                                                    <path d="M4 9h12a5 5 0 0 1 5 5v5" />
+                                                </svg>
+                                            </button>
                                         </div>
                                     ) : (
-                                        <>
-                                            <button onClick={() => setEditingId(tenant.id)} className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                                            <button onClick={() => handleDelete(tenant.id)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></button>
-                                        </>
+                                        <div className="flex items-center justify-center gap-2">
+                                            {/* Edit Button */}
+                                            <button
+                                                onClick={() => setEditingId(tenant.id)}
+                                                title="Edit Tenant"
+                                                className="h-9 w-9 flex items-center justify-center bg-gray-50 text-blue-500 hover:bg-blue-100 rounded-full transition-all border border-gray-100 shadow-sm"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                </svg>
+                                            </button>
+                                            {/* Delete Button */}
+                                            <button
+                                                onClick={() => handleDelete(tenant.id)}
+                                                title="Delete Tenant"
+                                                className="h-9 w-9 flex items-center justify-center bg-gray-50 text-red-400 hover:bg-red-100 rounded-full transition-all border border-gray-100 shadow-sm"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* 2. The Checkmark: Now perfectly positioned next to the icons */}
+                                    {showCheck === tenant.id && (
+                                        <div className="absolute right-7 translate-x-8 animate-in fade-in zoom-in-50 duration-300 pointer-events-none">
+                                            <div className="bg-emerald-500 text-white p-1 rounded-full shadow-lg border-2 border-white">
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4">
+                                                    <polyline points="20 6 9 17 4 12" />
+                                                </svg>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -333,7 +420,7 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
                                 </div>
                                 <div className="flex flex-col gap-2 md:col-span-2">
                                     <label className={labelClass}>Mobile Number (for WhatsApp)</label>
-                                    <input name="mobile" placeholder="e.g. 60123456789" className={inputBaseClass} />
+                                    <input name="mobile" placeholder="01x-xxxx-xxxx" onChange={handleMobileInput} className={inputBaseClass} />
                                 </div>
                             </div>
                             <button type="button" disabled={loading} onClick={(e) => handleSave(e)} className="mt-6 w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 transition-colors shadow-lg">
