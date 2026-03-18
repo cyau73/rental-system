@@ -133,9 +133,12 @@ export default function PropertyGeneralInfo({ property }: { property: any }) {
                     </div>
                     <div className="flex flex-col gap-1">
                         <label className={labelClass}>Status</label>
-                        <select name="status" defaultValue={property.status} className={inputBaseClass}>
-                            <option value="AVAILABLE">AVAILABLE</option>
-                            <option value="RENTED">RENTED</option>
+                        <select name="status"
+                            defaultValue={property?.status || "For Rent"}
+                            className={inputBaseClass}>
+                            <option value="For Sale">For Sale</option>
+                            <option value="For Rent">For Rent</option>
+                            <option value="Rented">Rented</option>
                         </select>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -152,6 +155,6 @@ export default function PropertyGeneralInfo({ property }: { property: any }) {
                     </div>
                 </div>
             </form>
-        </section>
+        </section >
     );
 }

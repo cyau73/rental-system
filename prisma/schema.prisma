@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PropertyStatus {
+  FOR_SALE   // Represents "For Sale"
+  FOR_RENT   // Represents "For Rent"
+  RENTED     // Represents "Rented"
+}
+
 model Property {
   id         String         @id @default(uuid())
   title      String
@@ -21,7 +27,7 @@ model Property {
   price      Decimal?
   // Media & Status
   images     String[]
-  status     PropertyStatus @default(AVAILABLE)
+  status     PropertyStatus @default(FOR_RENT)
   // Tenant History
   tenants    Tenant[]
   remarks    String?  @default("")
@@ -35,11 +41,6 @@ model Property {
 enum Role {
   ADMIN
   STAFF
-}
-
-enum PropertyStatus {
-  AVAILABLE
-  RENTED
 }
 
 model Account {

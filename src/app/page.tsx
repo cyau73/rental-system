@@ -5,6 +5,7 @@ import PropertyClientView from "@/components/PropertyClientView";
 import AdminNav from "@/components/AdminNav";
 import Welcome from "@/components/Welcome";
 import Footer from "@/components/Footer";
+import { PropertyStatus } from "@prisma/client";
 
 export default async function HomePage({
   searchParams,
@@ -17,7 +18,7 @@ export default async function HomePage({
 
   const rawProperties = await prisma.property.findMany({
     where: {
-      status: "AVAILABLE",
+      status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT, PropertyStatus.RENTED] },
       ...(query ? {
         OR: [
           { title: { contains: query, mode: "insensitive" } },
@@ -39,6 +40,7 @@ export default async function HomePage({
     images: Array.isArray(prop.images)
       ? prop.images.filter((url: string) => url && url.trim() !== "")
       : [],
+    statusDisplay: prop.status.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
     rental: Number(prop.rental || 0),
     price: Number(prop.price || 0),
     createdAt: prop.createdAt.toISOString(),

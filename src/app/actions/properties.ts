@@ -1,3 +1,5 @@
+//actions/properties.ts
+
 "use server";
 
 import { auth } from "@/auth";
@@ -75,12 +77,12 @@ export async function addProperty(formData: FormData) {
             slug,
             address,
             type,
-            landArea,
-            builtUp,
+            landArea: landArea ? parseFloat(landArea) : null, // Ensure numeric for Decimal
+            builtUp: builtUp ? parseFloat(builtUp) : null,   // Ensure numeric for Decimal
             rental: cleanRental,
             price: cleanPrice,
             remarks,
-            status: "AVAILABLE",
+            status: "FOR_RENT", // Use the Uppercase Enum value
             images: imageUrls,
         },
     });
@@ -100,7 +102,17 @@ export async function updateProperty(formData: FormData) {
     const address = formData.get("address") as string;
     const type = formData.get("type") as string;
     const remarks = formData.get("remarks") as string;
-    const status = formData.get("status") as any;
+    const status = formData.get("status") as string;
+
+    // Map UI strings to Prisma Enums
+    const statusMap: Record<string, any> = {
+        "For Sale": "FOR_SALE",
+        "For Rent": "FOR_RENT",
+        "Rented": "RENTED",
+        "FOR_SALE": "FOR_SALE", // Defensive check
+        "FOR_RENT": "FOR_RENT",
+        "RENTED": "RENTED"
+    };
 
     // FIXED: Corrected keys and type casting
     const landArea = parseFloat(formData.get("landArea") as string) || null;
