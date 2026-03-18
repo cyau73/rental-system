@@ -168,6 +168,44 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
         }
     };
 
+    const handleDuplicate = (tenant: any) => {
+        // 1. Open the form
+        setIsAddOpen(true);
+
+        // 2. Wait for the DOM to render the form
+        setTimeout(() => {
+            const form = document.querySelector('.tenant-form-container');
+            if (!form) return;
+
+            const inputs = form.querySelectorAll('input');
+
+            inputs.forEach((input: any) => {
+                const name = input.getAttribute('name');
+                if (!name) return;
+
+                // Mapping Logic
+                if (name === 'name') {
+                    input.value = `${tenant.name} (Copy)`;
+                } else if (['rentalAmount', 'securityDeposit', 'utilityDeposit'].includes(name)) {
+                    input.value = formatCurrency(tenant[name]);
+                } else if (name === 'mobile') {
+                    input.value = formatMobile(tenant.mobile || "");
+                } else if (name === 'startDate' || name === 'endDate') {
+                    // Ensure date is formatted as YYYY-MM-DD for the date input type
+                    if (tenant[name]) {
+                        input.value = tenant[name].split('T')[0];
+                    }
+                } else if (tenant[name] !== undefined) {
+                    // Catch-all for Email, Address, etc.
+                    input.value = tenant[name];
+                }
+            });
+
+            // 3. Smooth scroll
+            form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150); // Slight increase to 150ms to ensure the "End Date" input is ready
+    };
+
     const labelClass = "text-[10px] font-bold uppercase text-gray-600 ml-1 tracking-widest";
     const inputBaseClass = "border border-gray-300 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all bg-white text-gray-900 font-bold placeholder:text-gray-400";
 
@@ -294,8 +332,8 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
                                     )}
                                 </div>
 
+                                {/* 1. Save and Cancel Icons */}
                                 <div className="col-span-2 flex justify-center items-center gap-1 relative h-full">
-                                    {/* 1. The centered content (Now all Icons) */}
                                     {editingId === tenant.id ? (
                                         <div className="flex items-center justify-center gap-1">
                                             {/* Save Icon (Disk) */}
@@ -332,6 +370,17 @@ export default function Tenant({ tenants = [], propertyId }: { tenants: any[], p
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                </svg>
+                                            </button>
+                                            {/* Copy Button (New) */}
+                                            <button
+                                                onClick={() => handleDuplicate(tenant)}
+                                                title="Copy Details"
+                                                className="h-9 w-9 flex items-center justify-center bg-gray-50 text-amber-500 hover:bg-amber-100 rounded-full transition-all border border-gray-100 shadow-sm"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                                                 </svg>
                                             </button>
                                             {/* Delete Button */}
