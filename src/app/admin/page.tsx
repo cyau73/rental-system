@@ -32,7 +32,12 @@ export default async function AdminPage({
   const rawProperties = await prisma.property.findMany({
     where: {
       AND: [
-        // ... your query logic ...
+        query ? {
+          OR: [
+            { title: { contains: query, mode: "insensitive" } },
+            { address: { contains: query, mode: "insensitive" } },
+          ],
+        }: {},
         statusFilter === 'AVAILABLE'
           ? { status: { in: ['FOR_RENT', 'FOR_SALE'] } } // <--- THE "TWO AT ONCE" FIX
           : statusFilter
