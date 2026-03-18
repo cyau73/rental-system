@@ -1,9 +1,11 @@
-// src/components/PropertyGalleryCard.tsx
+//componets/PublicGalleryCard.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Lightbox from "@/components/LightBox";
+import { getStatusTheme } from "@/lib/status-styles"; // Ensure this import is correct
 
 export default function PublicGalleryCard({
     prop,
@@ -14,6 +16,9 @@ export default function PublicGalleryCard({
 }) {
     const [currentIdx, setCurrentIdx] = useState(0);
     const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+
+    const theme = getStatusTheme(prop.status);
+    const isForSale = prop.status === "FOR_SALE" || prop.status === "SOLD";
 
     const rawImages = (prop.images as string[]) || [];
     const images = rawImages.length > 0 ? rawImages : ["/placeholder-house.jpg"];
@@ -30,22 +35,12 @@ export default function PublicGalleryCard({
         setCurrentIdx((prev) => (prev - 1 + images.length) % images.length);
     }, [images.length]);
 
-    // 1. Dynamic classes for the outer container
-    // If 1x1, use flex-row on tablets/desktops. Otherwise, stay flex-col.
-    const containerClasses = layoutCols === 1
-        ? "flex flex-col md:flex-row min-h-[400px]"
-        : "flex flex-col h-full";
-
-    // 2. Dynamic classes for the image section
     const imageWrapperClasses = {
-        1: "w-full md:w-3/5 h-64 md:h-auto", // Horizontal 1x1
-        // 2x2: We use h-48 on small screens and h-64 on iPad to keep it tight
+        1: "w-full md:w-3/5 h-64 md:h-auto",
         2: "w-full h-48 md:h-64 lg:h-72",
-        3: "w-full h-40 md:h-48",             // 3x3: Very compact
+        3: "w-full h-40 md:h-48",
     }[layoutCols];
 
-    // 2. DYNAMIC PADDING LOGIC
-    // Reduce padding on 2x2 and 3x3 to save vertical space
     const contentPadding = layoutCols === 1 ? "p-8" : "p-4 md:p-5";
 
     return (
@@ -54,7 +49,7 @@ export default function PublicGalleryCard({
                 }`}>
 
                 {/* IMAGE SECTION */}
-                <div className={`relative w-full h-64 bg-gray-100 group shrink-0 overflow-hidden ${imageWrapperClasses}`}>
+                <div className={`relative w-full bg-gray-100 group shrink-0 overflow-hidden ${imageWrapperClasses}`}>
                     <Image
                         src={images[currentIdx] || "/placeholder-house.jpg"}
                         alt={prop.title}
@@ -62,7 +57,6 @@ export default function PublicGalleryCard({
                         className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
 
-                    {/* 1. NAVIGATION ARROWS - HIGHEST Z-INDEX (z-30) */}
                     {images.length > 1 && (
                         <div className="absolute inset-0 flex items-center justify-between px-2 z-30 pointer-events-none">
                             <button
@@ -80,7 +74,6 @@ export default function PublicGalleryCard({
                         </div>
                     )}
 
-                    {/* 2. CENTER HOVER ZONE - MIDDLE Z-INDEX (z-20) */}
                     <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
                         <div className="w-1/3 h-1/3 flex items-center justify-center group/btn pointer-events-auto">
                             <button
@@ -92,35 +85,45 @@ export default function PublicGalleryCard({
                             </button>
                         </div>
                     </div>
-
-                    {/* 3. PRICE TAG - LOWER Z-INDEX (z-10) 
-                    <div className="absolute top-4 right-4 bg-white/95 backdrop-blur px-4 py-1.5 rounded-xl shadow-sm border border-gray-100 z-10">
-                        <p className="text-sm font-black text-blue-600">${prop.rental.toLocaleString()}</p>
-                    </div>
-                    */}
                 </div>
 
                 {/* CONTENT SECTION */}
-                <div className={`${contentPadding} flex flex-col justify-center flex-grow`}>                    <div>
-                    <h3 className={`${layoutCols === 1 ? 'text-2xl' : 'text-lg'} font-extrabold text-gray-900 tracking-tight line-clamp-1`}>
-                        {prop.title}
-                    </h3>
-                    <p className={`${layoutCols === 1 ? 'text-l' : 'text-md'} text-gray-500 tracking-tight italic line-clamp-1`}>
-                        {prop.address}
-                    </p>
-                    <p className={`${layoutCols === 1 ? 'text-xl' : 'text-md'}   font-extrabold text-base text-blue-700 uppercase tracking-tight line-clamp-1`}>${Number(prop.rental || 0).toLocaleString()}</p>
-                </div>
-                    {/* Grid info - larger gap for 1x1 */}
-                    <div className="grid grid-cols-2 gap-4 py-3 border-t border-gray-100 mt-auto">
-                        <div className="text-right">
-                            <p className="md:text-xs font-bold text-gray-400 uppercase tracking-wider">Status</p>
-                            <p className="text-xs md:text-sm font-bold text-green-600">Available</p>
+                <div className={`${contentPadding} flex flex-col justify-center flex-grow`}>
+                    <div className="space-y-2">
+                        {/* STATUS BADGE - Before Title */}
+                        <div className="flex items-center gap-2">
+                            <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border-2 shadow-sm ${theme.bg} ${theme.text} ${theme.border}`}>
+                                {theme.label}
+                            </span>
+                        </div>
+
+                        <h3 className={`${layoutCols === 1 ? 'text-2xl' : 'text-lg'} font-extrabold text-gray-900 tracking-tight line-clamp-1`}>
+                            {prop.title}
+                        </h3>
+
+                        <p className={`${layoutCols === 1 ? 'text-base' : 'text-sm'} text-gray-500 tracking-tight italic line-clamp-1`}>
+                            📍 {prop.address}
+                        </p>
+
+                        {/* PRICE DISPLAY - Matches Admin Logic */}
+                        <div className="pt-1">
+                            {isForSale ? (
+                                <p className={`${layoutCols === 1 ? 'text-2xl' : 'text-xl'} font-black ${theme.text} tracking-tight`}>
+                                    ${Number(prop.price || 0).toLocaleString()}
+                                    <span className="ml-2 text-[9px] uppercase text-gray-400 font-black">Asking</span>
+                                </p>
+                            ) : (
+                                <p className={`${layoutCols === 1 ? 'text-xl' : 'text-lg'} font-black text-blue-700 tracking-tight`}>
+                                    ${Number(prop.rental || 0).toLocaleString()}
+                                    <span className="ml-2 text-[9px] uppercase text-gray-400 font-black">/ Month</span>
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
             </div >
 
-            {/* LIGHTBOX MODAL */}
+            {/* LIGHTBOX */}
             {previewIndex !== null && (
                 <Lightbox
                     images={images}

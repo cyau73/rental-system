@@ -18,7 +18,7 @@ export default async function HomePage({
 
   const rawProperties = await prisma.property.findMany({
     where: {
-      status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT, PropertyStatus.RENTED] },
+      status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT] },
       ...(query ? {
         OR: [
           { title: { contains: query, mode: "insensitive" } },
@@ -40,7 +40,10 @@ export default async function HomePage({
     images: Array.isArray(prop.images)
       ? prop.images.filter((url: string) => url && url.trim() !== "")
       : [],
-    statusDisplay: prop.status.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+    statusDisplay: prop.status
+      .replace(/_/g, ' ') // Replace underscore with space
+      .toLowerCase()
+      .replace(/\b\w/g, l => l.toUpperCase()),
     rental: Number(prop.rental || 0),
     price: Number(prop.price || 0),
     createdAt: prop.createdAt.toISOString(),

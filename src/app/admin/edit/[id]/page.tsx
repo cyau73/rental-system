@@ -10,6 +10,7 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import Tenant from "@/components/Tenant";
 import PropertyGeneralInfo from "@/components/PropertyGeneralInfo";
+import { getStatusTheme } from "@/lib/status-styles";
 
 export default async function EditPropertyPage({
     params,
@@ -37,6 +38,8 @@ export default async function EditPropertyPage({
         },
     });
     if (!propertyRaw) notFound();
+
+    const theme = getStatusTheme(propertyRaw.status);
 
     // --- CONSOLIDATED SERIALIZATION ---
     // This cleans the top-level property AND the nested tenants in one go

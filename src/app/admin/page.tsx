@@ -32,13 +32,12 @@ export default async function AdminPage({
   const rawProperties = await prisma.property.findMany({
     where: {
       AND: [
-        query ? {
-          OR: [
-            { title: { contains: query, mode: "insensitive" } },
-            { address: { contains: query, mode: "insensitive" } },
-          ],
-        } : {},
-        statusFilter ? { status: statusFilter as any } : {},
+        // ... your query logic ...
+        statusFilter === 'AVAILABLE'
+          ? { status: { in: ['FOR_RENT', 'FOR_SALE'] } } // <--- THE "TWO AT ONCE" FIX
+          : statusFilter
+            ? { status: statusFilter as any }
+            : {},
       ]
     },
     orderBy: [
@@ -58,6 +57,10 @@ export default async function AdminPage({
     updatedAt: prop.updatedAt.toISOString(),
     // Convert any other Date fields if they exist in your schema
     rentalStart: prop.rentalStart ? prop.rentalStart.toISOString() : null,
+    displayStatus: prop.status
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase()),
   }));
 
   const getTabClass = (active: boolean) =>
@@ -74,8 +77,19 @@ export default async function AdminPage({
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Link href="/admin" className={getTabClass(!statusFilter)}>All</Link>
-              <Link href={`/admin?status=AVAILABLE${query ? `&query=${query}` : ''}`} className={getTabClass(statusFilter === 'AVAILABLE')}>Available</Link>
-              <Link href={`/admin?status=RENTED${query ? `&query=${query}` : ''}`} className={getTabClass(statusFilter === 'RENTED')}>Rented</Link>
+              <Link
+                href={`/admin?status=AVAILABLE${query ? `&query=${query}` : ''}`}
+                className={getTabClass(statusFilter === 'AVAILABLE')}
+              >
+                Available
+              </Link>
+
+              <Link href={`/admin?status=RENTED${query ? `&query=${query}` : ''}`}
+                className={getTabClass(statusFilter === 'RENTED')}>Rented</Link>
+
+              {/* Optional: Add Sold */}
+              <Link href={`/admin?status=SOLD${query ? `&query=${query}` : ''}`}
+                className={getTabClass(statusFilter === 'SOLD')}>Sold</Link>
             </div>
           </div>
           <div className="w-full md:w-72">

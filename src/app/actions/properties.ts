@@ -102,16 +102,26 @@ export async function updateProperty(formData: FormData) {
     const address = formData.get("address") as string;
     const type = formData.get("type") as string;
     const remarks = formData.get("remarks") as string;
-    const status = formData.get("status") as string;
+    const rawStatus = formData.get("status") as string;
 
     // Map UI strings to Prisma Enums
-    const statusMap: Record<string, any> = {
+    const statusMap: Record<string, string> = {
         "For Sale": "FOR_SALE",
         "For Rent": "FOR_RENT",
         "Rented": "RENTED",
-        "FOR_SALE": "FOR_SALE", // Defensive check
+        "Sold": "SOLD",
+        "Not Available": "NOT_AVAILABLE",
+        // Case-insensitive / direct matches
+        "FOR_SALE": "FOR_SALE",
         "FOR_RENT": "FOR_RENT",
-        "RENTED": "RENTED"
+        "RENTED": "RENTED",
+        "SOLD": "SOLD",
+        "NOT_AVAILABLE": "NOT_AVAILABLE"
+    };
+    const status = statusMap[rawStatus] || "FOR_RENT"; // Default fallback
+    const parseNum = (key: string) => {
+        const val = formData.get(key) as string;
+        return val ? parseFloat(val.replace(/,/g, "")) : null;
     };
 
     // FIXED: Corrected keys and type casting
@@ -133,7 +143,7 @@ export async function updateProperty(formData: FormData) {
             title,
             address,
             type,
-            status,
+            status: status as any,
             landArea,
             builtUp,
             remarks,

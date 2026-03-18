@@ -11,6 +11,8 @@ enum PropertyStatus {
   FOR_SALE   // Represents "For Sale"
   FOR_RENT   // Represents "For Rent"
   RENTED     // Represents "Rented"
+  SOLD
+  NOT_AVAILABLE
 }
 
 model Property {
