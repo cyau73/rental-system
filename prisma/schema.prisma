@@ -12,13 +12,20 @@ model Property {
   title      String
   slug       String?         @unique
   address    String
+  type       String?  @default("")
+  // Dimensions
+  landArea   String?  @default("")
+  builtUp    String?  @default("")
+  // Financials
   rental     Decimal?
   price      Decimal?
-  rentalStart DateTime?
-  rentalDuration Decimal?
+  // Media & Status
   images     String[]
   status     PropertyStatus @default(AVAILABLE)
+  // Tenant History
   tenants    Tenant[]
+  remarks    String?  @default("")
+  // Listing order
   order          Int      @default(0)
   isPinned       Boolean  @default(false)
   createdAt  DateTime       @default(now())
@@ -78,8 +85,8 @@ model Tenant {
   id              String   @id @default(uuid()) 
   name            String 
   address         String 
-  mobile          String 
-  email           String 
+  mobile          String? 
+  email           String? 
   rentalAmount    Decimal? 
   startDate       DateTime? 
   endDate         DateTime? 

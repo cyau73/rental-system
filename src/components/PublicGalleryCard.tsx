@@ -112,10 +112,6 @@ export default function PublicGalleryCard({
                 </div>
                     {/* Grid info - larger gap for 1x1 */}
                     <div className="grid grid-cols-2 gap-4 py-3 border-t border-gray-100 mt-auto">
-                        <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Term</p>
-                            <p className="md:text-xs font-bold text-gray-900">{prop.rentalDuration} Months</p>
-                        </div>
                         <div className="text-right">
                             <p className="md:text-xs font-bold text-gray-400 uppercase tracking-wider">Status</p>
                             <p className="text-xs md:text-sm font-bold text-green-600">Available</p>

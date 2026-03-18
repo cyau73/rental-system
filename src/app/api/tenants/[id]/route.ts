@@ -21,6 +21,8 @@ export async function PATCH(
             where: { id },
             data: {
                 name: body.name,
+                email: body.email || "", // Handle empty string as null if preferred
+                mobile: body.mobile || "",
                 rentalAmount: body.rentalAmount ? parseFloat(body.rentalAmount) : null,
                 securityDeposit: body.securityDeposit ? parseFloat(body.securityDeposit) : null,
                 utilityDeposit: body.utilityDeposit ? parseFloat(body.utilityDeposit) : null,

@@ -8,6 +8,15 @@ import prisma from "@/lib/prisma";
 import fs from "fs/promises";
 import path from "path";
 
+function generateSlug(title: string): string {
+    return title
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '') // Remove special characters
+        .replace(/[\s_-]+/g, '-')  // Replace spaces/underscores with hyphens
+        .replace(/^-+|-+$/g, '');  // Trim hyphens from ends
+}
+
 /**
  * Helper to check admin authorization
  */
@@ -26,39 +35,53 @@ export async function addProperty(formData: FormData) {
 
     const title = formData.get("title") as string;
     const address = formData.get("address") as string;
+    const type = formData.get("type") as string;
+    const remarks = formData.get("remarks") as string;
+
+    // FIXED: Corrected the keys and converted to Numbers for Decimal support
+    const landArea = formData.get("landArea") as string || null;
+    const builtUp = formData.get("builtUp") as string || null;
+
+    // RENTAL PRICE
     const rawRental = formData.get("rental") as string;
     const cleanRental = rawRental ? parseFloat(rawRental.replace(/,/g, "")) : 0;
-    const rentalDuration = formData.get("rentalDuration") as string;
 
+    // ASKING PRICE (Added this as we added it to schema)
+    const rawPrice = formData.get("price") as string;
+    const cleanPrice = rawPrice ? parseFloat(rawPrice.replace(/,/g, "")) : 0;
+
+    // AUTO-GENERATE SLUG
+    const slug = generateSlug(title);
+
+    // Initial Image Handling for new properties
     const imageFiles = formData.getAll("images") as File[];
     const imageUrls: string[] = [];
-
     const uploadDir = path.join(process.cwd(), "public", "uploads");
     await fs.mkdir(uploadDir, { recursive: true });
 
-    if (imageFiles && imageFiles.length > 0) {
-        for (const file of imageFiles) {
-            if (file.size > 0 && file.name !== 'undefined') {
-                const buffer = Buffer.from(await file.arrayBuffer());
-                const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
-                const filePath = path.join(uploadDir, fileName);
-
-                await fs.writeFile(filePath, buffer);
-                imageUrls.push(`/uploads/${fileName}`);
-                // LOG: Successful upload
-                await logAction(`New property image uploaded: ${fileName}`);
-            }
+    for (const file of imageFiles) {
+        if (file.size > 0 && file.name !== 'undefined') {
+            const buffer = Buffer.from(await file.arrayBuffer());
+            const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+            const filePath = path.join(uploadDir, fileName);
+            await fs.writeFile(filePath, buffer);
+            imageUrls.push(`/uploads/${fileName}`);
         }
     }
 
     await prisma.property.create({
         data: {
             title,
+            slug,
             address,
+            type,
+            landArea,
+            builtUp,
             rental: cleanRental,
-            rentalDuration: rentalDuration ? parseInt(rentalDuration) : null,
-            images: imageUrls,
+            price: cleanPrice,
+            remarks,
             status: "AVAILABLE",
+            images: imageUrls,
         },
     });
 
@@ -75,82 +98,40 @@ export async function updateProperty(formData: FormData) {
     const id = formData.get("id") as string;
     const title = formData.get("title") as string;
     const address = formData.get("address") as string;
+    const type = formData.get("type") as string;
+    const remarks = formData.get("remarks") as string;
     const status = formData.get("status") as any;
+
+    // FIXED: Corrected keys and type casting
+    const landArea = parseFloat(formData.get("landArea") as string) || null;
+    const builtUp = parseFloat(formData.get("builtUp") as string) || null;
+
     const rawRental = formData.get("rental") as string;
     const cleanRental = rawRental ? parseFloat(rawRental.replace(/,/g, "")) : 0;
-    const rentalDuration = formData.get("rentalDuration") as string;
-    const rentalStart = formData.get("rentalStart") as string;
 
-    // 1. Get current images from Database
-    const currentProperty = await prisma.property.findUnique({
-        where: { id },
-        select: { images: true }
-    });
+    const rawPrice = formData.get("price") as string;
+    const cleanPrice = rawPrice ? parseFloat(rawPrice.replace(/,/g, "")) : 0;
 
-    // 2. Get images currently in the frontend ImageManager (existingImages inputs)
-    const existingImagesInForm = formData.getAll("existingImages") as string[];
-
-    // --- START: DELETION TRACKING & DISK CLEANUP ---
-    if (currentProperty?.images) {
-        // Filter out images that are in DB but NOT in the new form data
-        const imagesToDelete = currentProperty.images.filter(
-            (img) => !existingImagesInForm.includes(img)
-        );
-
-        for (const imagePath of imagesToDelete) {
-            try {
-                // Remove leading slash so path.join works correctly with 'public'
-                const relativePath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
-                const fullPath = path.join(process.cwd(), "public", relativePath);
-
-                // Perform physical disk deletion
-                await fs.access(fullPath);
-                await fs.unlink(fullPath);
-
-                // HIGHLIGHT: Tracking successful deletion in log
-                await logAction(`CLEANUP SUCCESS: Deleted file ${imagePath} from disk.`);
-            } catch (err) {
-                // HIGHLIGHT: Tracking failed deletion in log (e.g., file already gone)
-                await logAction(`CLEANUP SKIPPED/FAILED: ${imagePath} - check if file exists.`);
-            }
-        }
-    }
-    // --- END: DELETION TRACKING ---
-
-    // 4. Handle new file uploads
-    const newFiles = formData.getAll("newImages") as File[];
-    const newImageUrls: string[] = [];
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-
-    for (const file of newFiles) {
-        if (file && file.size > 0) {
-            const buffer = Buffer.from(await file.arrayBuffer());
-            const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
-            const filePath = path.join(uploadDir, fileName);
-
-            await fs.mkdir(uploadDir, { recursive: true });
-            await fs.writeFile(filePath, buffer);
-            newImageUrls.push(`/uploads/${fileName}`);
-        }
-    }
-
-    const finalImages = [...existingImagesInForm, ...newImageUrls];
+    // NOTE: Image cleanup logic removed here because ImageManager.tsx 
+    // now handles deletions instantly via deletePropertyImage()
 
     await prisma.property.update({
         where: { id },
         data: {
             title,
             address,
+            type,
             status,
+            landArea,
+            builtUp,
+            remarks,
             rental: cleanRental,
-            rentalDuration: rentalDuration ? parseInt(rentalDuration) : null,
-            rentalStart: rentalStart ? new Date(rentalStart) : null,
-            images: finalImages,
+            price: cleanPrice,
+            // FIXED: Removed rentalDuration and rentalStart as they are no longer in schema
         },
     });
 
-    // LOG: Final update success
-    await logAction(`UPDATE SUCCESS: Property ${id} database updated.`);
+    await logAction(`UPDATE SUCCESS: Property ${id} details updated.`);
 
     revalidatePath("/admin");
     revalidatePath(`/admin/edit/${id}`);
@@ -274,5 +255,53 @@ export async function updatePropertyOrder(
     } catch (error) {
         console.error("Failed to update property order:", error);
         throw new Error("Failed to save property order.");
+    }
+}
+
+/**
+ * Action: Instantly delete a specific image from DB and Disk
+ */
+export async function deletePropertyImage(propertyId: string, imagePath: string) {
+    await checkAdmin();
+
+    try {
+        // 1. Get the current property to see the image list
+        const property = await prisma.property.findUnique({
+            where: { id: propertyId },
+            select: { images: true }
+        });
+
+        if (!property) throw new Error("Property not found");
+
+        // 2. Create the new array without the deleted image
+        const updatedImages = property.images.filter((img) => img !== imagePath);
+
+        // 3. Update the Database first
+        await prisma.property.update({
+            where: { id: propertyId },
+            data: { images: updatedImages },
+        });
+
+        // 4. Physical Disk Cleanup
+        // Remove leading slash for path.join (e.g., '/uploads/file.jpg' -> 'uploads/file.jpg')
+        const relativePath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+        const fullPath = path.join(process.cwd(), "public", relativePath);
+
+        try {
+            await fs.access(fullPath); // Check if it exists
+            await fs.unlink(fullPath); // Delete it
+            await logAction(`DELETE IMAGE SUCCESS: Removed ${imagePath} from disk and property ${propertyId}`);
+        } catch (unlinkErr) {
+            // Log but don't crash if the file was already missing from disk
+            await logAction(`DELETE IMAGE WARNING: ${imagePath} removed from DB, but file was missing on disk.`);
+        }
+
+        // 5. Refresh the UI
+        revalidatePath(`/admin/edit/${propertyId}`);
+        return { success: true };
+
+    } catch (error) {
+        console.error("Failed to delete image:", error);
+        throw new Error("Failed to delete image.");
     }
 }

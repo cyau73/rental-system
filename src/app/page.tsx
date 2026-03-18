@@ -40,8 +40,9 @@ export default async function HomePage({
       ? prop.images.filter((url: string) => url && url.trim() !== "")
       : [],
     rental: Number(prop.rental || 0),
-    rentalDuration: Number(prop.rentalDuration || 12),
+    price: Number(prop.price || 0),
     createdAt: prop.createdAt.toISOString(),
+    updatedAt: prop.updatedAt.toISOString(),
   }));
 
   return (

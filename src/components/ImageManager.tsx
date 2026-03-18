@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { uploadPropertyImage, reorderPropertyImages } from "@/app/actions/properties";
+// ADDED deletePropertyImage to imports
+import { uploadPropertyImage, reorderPropertyImages, deletePropertyImage } from "@/app/actions/properties";
 import {
     DndContext,
     closestCenter,
@@ -93,8 +94,6 @@ function SortableImage({
                     Cover Image
                 </div>
             )}
-
-            <input type="hidden" name="existingImages" value={url} />
         </div>
     );
 }
@@ -105,9 +104,12 @@ export default function ImageManager({ initialImages, propertyId }: { initialIma
     const [isUploading, setIsUploading] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [previewIndex, setPreviewIndex] = useState<number | null>(null);
-    const [showUndo, setShowUndo] = useState(false);
-    const [lastDeleted, setLastDeleted] = useState<{ url: string; index: number } | null>(null);
     const [isMounted, setIsMounted] = useState(false);
+
+    // MERGED UNDO STATE (Removed duplicates)
+    const [lastDeleted, setLastDeleted] = useState<{ url: string; index: number } | null>(null);
+    const [showUndo, setShowUndo] = useState(false);
+    const [deleteTimeout, setDeleteTimeout] = useState<NodeJS.Timeout | null>(null);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -116,15 +118,13 @@ export default function ImageManager({ initialImages, propertyId }: { initialIma
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
-    const showNext = useCallback((e?: React.MouseEvent) => {
-        e?.stopPropagation();
+    const showNext = useCallback(() => {
         if (previewIndex !== null) {
             setPreviewIndex((previewIndex + 1) % images.length);
         }
     }, [previewIndex, images.length]);
 
-    const showPrev = useCallback((e?: React.MouseEvent) => {
-        e?.stopPropagation();
+    const showPrev = useCallback(() => {
         if (previewIndex !== null) {
             setPreviewIndex((previewIndex - 1 + images.length) % images.length);
         }
@@ -160,7 +160,7 @@ export default function ImageManager({ initialImages, propertyId }: { initialIma
                 setTimeout(() => setIsSyncing(false), 800);
             }
         }
-    }; // Fixed: Closed the brace here!
+    };
 
     const handleInstantUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -182,22 +182,39 @@ export default function ImageManager({ initialImages, propertyId }: { initialIma
     };
 
     const handleRemoveImage = (url: string, index: number) => {
+        if (deleteTimeout) clearTimeout(deleteTimeout);
+
         setLastDeleted({ url, index });
         setImages((prev) => prev.filter((img) => img !== url));
         setShowUndo(true);
+
+        const timeout = setTimeout(async () => {
+            try {
+                await deletePropertyImage(propertyId, url);
+                setShowUndo(false);
+                setLastDeleted(null);
+            } catch (err) {
+                console.error("Delete failed:", err);
+            }
+        }, 5000);
+
+        setDeleteTimeout(timeout);
     };
 
     const handleUndo = () => {
         if (lastDeleted) {
+            if (deleteTimeout) clearTimeout(deleteTimeout);
+
             const newImages = [...images];
             newImages.splice(lastDeleted.index, 0, lastDeleted.url);
             setImages(newImages);
+
             setShowUndo(false);
             setLastDeleted(null);
+            setDeleteTimeout(null);
         }
     };
 
-    // If we aren't mounted yet, render a simplified "skeleton" or static version
     if (!isMounted) {
         return (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-pulse">
@@ -258,9 +275,9 @@ export default function ImageManager({ initialImages, propertyId }: { initialIma
             </div>
 
             {showUndo && (
-                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-4 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl">
-                    <span className="text-sm">Image removed</span>
-                    <button type="button" onClick={handleUndo} className="text-blue-400 font-bold text-sm uppercase hover:text-blue-300">
+                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-4 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl border border-white/10 animate-in fade-in slide-in-from-bottom-4">
+                    <span className="text-sm font-medium">Image removed</span>
+                    <button type="button" onClick={handleUndo} className="text-blue-400 font-bold text-sm uppercase hover:text-blue-300 transition-colors">
                         Undo
                     </button>
                 </div>
