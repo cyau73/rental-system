@@ -65,12 +65,20 @@ export default function PropertyListDraggable({ properties = [] }: { properties:
             item.id === id ? { ...item, isPinned: !item.isPinned } : item
         );
 
+        // Re-sort to respect the Pin -> Order hierarchy
         const sorted = [...newItems].sort((a, b) => {
+            // 1. Pins always win
             if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-            return 0;
+
+            // 2. Then follow the manual 'order'
+            if (a.order !== b.order) return a.order - b.order;
+
+            // 3. Fallback to title logic if order is the same (usually 0)
+            return a.title.localeCompare(b.title, undefined, { numeric: true });
         });
 
         setItems(sorted);
+
         const updates = sorted.map((item, index) => ({
             id: item.id,
             order: index,

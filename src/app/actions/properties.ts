@@ -10,13 +10,76 @@ import prisma from "@/lib/prisma";
 import fs from "fs/promises";
 import path from "path";
 
-function generateSlug(title: string): string {
-    return title
+/**
+ * Action: Reset all manual ordering to 0
+ */
+export async function resetPropertyOrder() {
+    await checkAdmin(); // Security check
+
+    try {
+        await prisma.property.updateMany({
+            data: {
+                order: 0,
+                isPinned: false // Optional: Unpin everything too for a total reset
+            }
+        });
+
+        await logAction("ORDER RESET: All properties set to order 0.");
+
+        revalidatePath("/admin");
+        revalidatePath("/");
+
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to reset order:", error);
+        throw new Error("Failed to reset property order.");
+    }
+}
+/**
+ * Generate a unique slug based on the title, ensuring no duplicates in the database. If a duplicate exists, append a number suffix (e.g., "property-title", "property-title_1", "property-title_2", etc.). The currentId parameter is used to exclude the current property when updating an existing one.
+ */
+async function generateUniqueSlug(title: string, currentId?: string): Promise<string> {
+    const baseSlug = title
         .toLowerCase()
         .trim()
-        .replace(/[^\w\s-]/g, '') // Remove special characters
-        .replace(/[\s_-]+/g, '-')  // Replace spaces/underscores with hyphens
-        .replace(/^-+|-+$/g, '');  // Trim hyphens from ends
+        .replace(/[^\w\s]/g, '')    // 1. Remove all special chars (including existing hyphens)
+        .replace(/\s+/g, '_')       // 2. Replace spaces with underscores
+        .replace(/_+/g, '_')        // 3. Prevent double underscores
+        .replace(/^_+|_+$/g, '');   // 4. Trim underscores from ends
+
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+
+    while (true) {
+        const existing = await prisma.property.findFirst({
+            where: {
+                slug: uniqueSlug,
+                NOT: currentId ? { id: currentId } : undefined,
+            },
+        });
+
+        if (!existing) break;
+
+        // If a duplicate exists, append a number with an underscore
+        uniqueSlug = `${baseSlug}_${counter}`;
+        counter++;
+    }
+    return uniqueSlug;
+}
+
+export async function checkSlugAvailability(title: string) {
+    const baseSlug = title.toLowerCase().trim().replace(/[\s-]+/g, '_').replace(/[^\w]/g, '');
+
+    // Find the highest suffix for this base slug
+    const existing = await prisma.property.findMany({
+        where: { slug: { startsWith: baseSlug } },
+        select: { slug: true }
+    });
+
+    if (existing.length === 0) return baseSlug;
+
+    // Logic to find the next available number (e.g., base_1, base_2)
+    return `${baseSlug}_${existing.length}`;
 }
 
 /**
@@ -53,7 +116,7 @@ export async function addProperty(formData: FormData) {
     const cleanPrice = rawPrice ? parseFloat(rawPrice.replace(/,/g, "")) : 0;
 
     // AUTO-GENERATE SLUG
-    const slug = generateSlug(title);
+    const slug = await generateUniqueSlug(title);
 
     // Initial Image Handling for new properties
     const imageFiles = formData.getAll("images") as File[];
@@ -70,23 +133,28 @@ export async function addProperty(formData: FormData) {
             imageUrls.push(`/uploads/${fileName}`);
         }
     }
-
-    await prisma.property.create({
-        data: {
-            title,
-            slug,
-            address,
-            type,
-            landArea: landArea ? parseFloat(landArea) : null, // Ensure numeric for Decimal
-            builtUp: builtUp ? parseFloat(builtUp) : null,   // Ensure numeric for Decimal
-            rental: cleanRental,
-            price: cleanPrice,
-            remarks,
-            status: "FOR_RENT", // Use the Uppercase Enum value
-            images: imageUrls,
-        },
-    });
-
+    try {
+        await prisma.property.create({
+            data: {
+                title,
+                slug,
+                address,
+                type,
+                landArea: landArea ? parseFloat(landArea) : null, // Ensure numeric for Decimal
+                builtUp: builtUp ? parseFloat(builtUp) : null,   // Ensure numeric for Decimal
+                rental: cleanRental,
+                price: cleanPrice,
+                remarks,
+                status: "FOR_RENT", // Use the Uppercase Enum value
+                images: imageUrls,
+            },
+        });
+    } catch (error: any) {
+        if (error.code === 'P2002') {
+            throw new Error("A property with a very similar title already exists. Please modify the title.");
+        }
+        throw error;
+    }
     revalidatePath("/admin");
     revalidatePath("/");
 }
@@ -103,6 +171,9 @@ export async function updateProperty(formData: FormData) {
     const type = formData.get("type") as string;
     const remarks = formData.get("remarks") as string;
     const rawStatus = formData.get("status") as string;
+
+    // Generate a new unique slug based on the new title
+    const slug = await generateUniqueSlug(title, id);
 
     // Map UI strings to Prisma Enums
     const statusMap: Record<string, string> = {
@@ -141,6 +212,7 @@ export async function updateProperty(formData: FormData) {
         where: { id },
         data: {
             title,
+            slug,
             address,
             type,
             status: status as any,
