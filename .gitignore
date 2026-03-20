@@ -47,3 +47,6 @@ next-env.d.ts
 logs.json
 
 .env.local
+
+db_backup/
+*.sql

@@ -30,31 +30,6 @@ export default async function AdminPage({
   const query = params.query;
   const statusFilter = params.status;
 
-  // Data Fetching
-  // const rawProperties = await prisma.property.findMany({
-  //   where: {
-  //     AND: [
-  //       query ? {
-  //         OR: [
-  //           { title: { contains: query, mode: "insensitive" } },
-  //           { address: { contains: query, mode: "insensitive" } },
-  //         ],
-  //       } : {},
-  //       statusFilter === 'AVAILABLE'
-  //         ? { status: { in: ['FOR_RENT', 'FOR_SALE'] } } // <--- THE "TWO AT ONCE" FIX
-  //         : statusFilter
-  //           ? { status: statusFilter as any }
-  //           : {},
-  //     ]
-  //   },
-  //   orderBy: [
-  //     { isPinned: 'desc' },
-  //     { order: 'asc' },
-  //     { title: 'asc' },
-  //   ],
-  // });
-  // app/admin/page.tsx
-
   // 1. Prepare the search term for Postgres ILIKE
   const searchTerm = query ? `%${query}%` : '%';
 
@@ -206,8 +181,24 @@ export default async function AdminPage({
                     className="border border-gray-300 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm text-black font-mono"
                   />
                 </div>
-
                 <div className="flex flex-col gap-1">
+                  <label className="text-[9px] font-extrabold text-black ml-1 uppercase tracking-widest">
+                    Status
+                  </label>
+                  <select
+                    name="status"
+                    defaultValue="RENTED" // This now correctly points to your RENTED enum
+                    className="border border-gray-300 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm text-black bg-white appearance-none"
+                  >
+                    <option value="FOR_SALE">For Sale</option>
+                    <option value="FOR_RENT">For Rent</option>
+                    <option value="RENTED">Rented</option>
+                    <option value="SOLD">Sold</option>
+                    <option value="NOT_AVAILABLE">Not Available</option>
+                  </select>
+                </div>
+
+                {/* <div className="flex flex-col gap-1">
                   <label className="text-[9px] font-extrabold text-black ml-1 uppercase tracking-widest">
                     Photos
                   </label>
@@ -218,7 +209,7 @@ export default async function AdminPage({
                     accept="image/*"
                     className="text-[10px] file:bg-blue-600 file:text-white file:font-bold file:rounded-lg file:border-0 file:px-3 file:py-1 text-black"
                   />
-                </div>
+                </div> */}
               </div>
               <SubmitButton label="Add New Property" />
             </form>

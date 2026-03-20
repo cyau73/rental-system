@@ -103,6 +103,8 @@ export async function addProperty(formData: FormData) {
     const type = formData.get("type") as string;
     const remarks = formData.get("remarks") as string;
 
+    const status = formData.get("status") as string;
+
     // FIXED: Corrected the keys and converted to Numbers for Decimal support
     const landArea = formData.get("landArea") as string || null;
     const builtUp = formData.get("builtUp") as string || null;
@@ -145,7 +147,7 @@ export async function addProperty(formData: FormData) {
                 rental: cleanRental,
                 price: cleanPrice,
                 remarks,
-                status: "FOR_RENT", // Use the Uppercase Enum value
+                status: (status as any) || "RENTED",
                 images: imageUrls,
             },
         });
