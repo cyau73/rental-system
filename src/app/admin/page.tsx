@@ -35,32 +35,51 @@ export default async function AdminPage({
 
   // A. Main Data Fetch (The Search Results)
   const rawProperties: any[] = await prisma.$queryRaw`
-  SELECT * FROM "Property"
+  SELECT 
+  p.*, 
+  t.name as "currentTenantName",
+  t."startDate",
+  t."endDate",
+  t."securityDeposit",
+  t."utilityDeposit"
+
+FROM "Property" p
+LEFT JOIN "Tenant" t ON t.id = (
+  SELECT id FROM "Tenant" 
+  WHERE "propertyId" = p.id 
+  ORDER BY "startDate" DESC LIMIT 1
+)
   WHERE 
-    (title ILIKE ${searchTerm} OR address ILIKE ${searchTerm})
-    AND (
-      (${statusFilter === 'AVAILABLE'} AND status IN ('FOR_RENT', 'FOR_SALE'))
-      OR 
-      (${!!statusFilter && statusFilter !== 'AVAILABLE'} AND status::text = ${statusFilter})
-      OR 
-      (${!statusFilter})
-    )
-  ORDER BY 
-    "isPinned" DESC, 
-    "order" ASC,
-    -- 1. Sort by the base name (everything before the first hyphen)
-    split_part(title, '-', 1) ASC,
-    -- 2. Custom Suffix Logic
-    CASE 
-      WHEN title NOT LIKE '%-%' THEN 0      -- Base names (MR01) come first
-      WHEN title ILIKE '%-G' THEN 1         -- Ground floor (-G) second
-      WHEN title ILIKE '%-M' THEN 2         -- Mezzanine (-M) third
-      WHEN title ~ '-\d' THEN 3             -- Numbers (-1, -2) fourth
-      ELSE 4                                -- Anything else last
-    END ASC,
-    -- 3. Finally, numeric sort for the actual unit numbers
-    length(title) ASC,                      -- Helps keep "MR01-2" before "MR01-10"
-    title ASC
+(p.title ILIKE ${searchTerm} OR p.address ILIKE ${searchTerm})
+  AND (
+    (${statusFilter === 'AVAILABLE'} AND p.status IN ('FOR_RENT', 'FOR_SALE'))
+    OR 
+    (${!!statusFilter && statusFilter !== 'AVAILABLE'} AND p.status::text = ${statusFilter})
+    OR 
+    (${!statusFilter})
+  )
+ORDER BY 
+  -- 1. KEEP PINNED AT THE TOP
+  p."isPinned" DESC, 
+  
+  -- 2. PRIMARY SORT: Group by the building/base name (MP0020, then MP0030)
+  split_part(p.title, '-', 1) ASC,
+
+  -- 3. SECONDARY SORT: Order within that specific building group
+  CASE 
+    WHEN p.title NOT LIKE '%-%' THEN 0      -- Base unit (MP0020) FIRST
+    WHEN p.title ILIKE '%-G' THEN 1         -- Ground floor (-G) SECOND
+    WHEN p.title ILIKE '%-M' THEN 2         -- Mezzanine (-M) THIRD
+    WHEN p.title ~ '-\d' THEN 3             -- Numbers (-1, -2) FOURTH
+    ELSE 4                                  -- Everything else
+  END ASC,
+
+  -- 4. TERTIARY SORT: Numeric order for the units (helps with -2 before -10)
+  length(p.title) ASC,
+  p.title ASC,
+
+  -- 5. MANUAL DRAG-DROP ORDER (Only if same title/rank)
+  p."order" ASC
 `;
 
   const searchTotal = rawProperties.length;
@@ -74,29 +93,63 @@ export default async function AdminPage({
     rawProperties.map(p => p.title.split('-')[0].trim())
   ).size;
 
+  const now = new Date();
+
   // 3. SERIALIZATION FIX: Convert Prisma Decimals/Dates to Plain Objects
-  // This prevents the "Decimal objects are not supported" error in Client Components
-  const properties = rawProperties.map(prop => ({
-    ...prop,
-    // Postgres returns Decimal as an object; convert to Number for the frontend    rental: Number(prop.rental || 0),
-    rental: Number(prop.rental || 0),
-    price: prop.price ? Number(prop.price) : null,
-    landArea: prop.landArea ? Number(prop.landArea) : null,
-    builtUp: prop.builtUp ? Number(prop.builtUp) : null,
+  const properties = rawProperties.map(prop => {
+    // 1. Logic to determin if the Tenant is "Current" or "Previous" based on endDate
+    const endDate = prop.endDate ? new Date(prop.endDate) : null;
+    const isExpired = endDate && endDate < now;
 
-    // Convert Dates to Strings for Client Components
-    createdAt: prop.createdAt instanceof Date ? prop.createdAt.toISOString() : prop.createdAt,
-    updatedAt: prop.updatedAt instanceof Date ? prop.updatedAt.toISOString() : prop.updatedAt,
+    // Format the date for the UI
+    const formattedEndDate = endDate
+      ? endDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : null;
 
-    images: prop.images,
-    isPinned: prop.isPinned,
-    order: prop.order,
+    let tenantDisplay = "VACANT";
+    if (prop.currentTenantName) {
+      tenantDisplay = isExpired
+        ? `PREVIOUS: ${prop.currentTenantName}`
+        : prop.currentTenantName;
+    }
 
-    displayStatus: prop.status
-      .replace(/_/g, ' ')
-      .toLowerCase()
-      .replace(/\b\w/g, (char: string) => char.toUpperCase()),
-  }));
+    // Define the dynamic availability string
+    let availabilityLabel = prop.status.replace(/_/g, ' '); // Fallback
+    if (isExpired) {
+      availabilityLabel = `ENDED (${formattedEndDate})`;
+    } else if (prop.status === 'RENTED' && formattedEndDate) {
+      availabilityLabel = `RENTED (UNTIL ${formattedEndDate})`;
+    }
+
+    // 2. Return the object explicitly
+    return {
+      ...prop,
+      // Convert Decimals to Numbers
+      rental: Number(prop.rental || 0),
+      price: prop.price ? Number(prop.price) : null,
+      landArea: prop.landArea ? Number(prop.landArea) : null,
+      builtUp: prop.builtUp ? Number(prop.builtUp) : null,
+
+      // Deposits: Ensure they are numbers and default to 0 if null/undefined
+      securityDeposit: Number(prop.securityDeposit || 0),
+      utilityDeposit: Number(prop.utilityDeposit || 0),
+
+      // Use the logic variables we calculated above
+      currentTenant: tenantDisplay,
+      isVacant: !prop.currentTenantName || isExpired,
+      displayStatus: availabilityLabel.toUpperCase(), // Keep it bold/uppercase
+      endDate: prop.endDate, // Keep raw date for other logic if needed
+
+      // Convert Dates to Strings for Client Components
+      createdAt: prop.createdAt instanceof Date ? prop.createdAt.toISOString() : prop.createdAt,
+      updatedAt: prop.updatedAt instanceof Date ? prop.updatedAt.toISOString() : prop.updatedAt,
+      // endDate: prop.endDate instanceof Date ? prop.endDate.toISOString() : prop.endDate,
+
+      images: prop.images,
+      isPinned: prop.isPinned,
+      order: prop.order,
+    };
+  });
 
   // --- 3. Calculate "Base Properties" (No -G, -M, -1 etc) ---
   // We can do this by filtering the main rawProperties array we already fetched

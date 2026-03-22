@@ -226,6 +226,64 @@ function SortablePropertyCard({ prop, onPin }: { prop: any; onPin: () => void })
                                 {isForSale ? 'Asking Price' : 'Monthly'}
                             </span>
                         </p>
+                        <div className="flex flex-col gap-3 p-2">
+                            {/* Tenant Row */}
+                            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                                <div className="flex flex-col">
+                                    <span className="text-[8px] font-extrabold text-gray-400 uppercase tracking-widest">
+                                        Tenant
+                                    </span>
+                                    <span className={`text-xs font-black uppercase tracking-tight ${prop.isVacant ? 'text-gray-400 italic' : 'text-black'}`}>
+                                        {prop.currentTenant}
+                                    </span>
+                                </div>
+
+                                {/* Status Badge (Matches your existing styling) */}
+                                <div className="flex flex-col items-end">
+                                    <span className="text-[8px] font-extrabold text-gray-400 uppercase tracking-widest">
+                                        Availability
+                                    </span>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${prop.isVacant ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                                        {prop.displayStatus}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Financials Grid */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <div className="flex flex-col">
+                                    <span className="text-[8px] font-extrabold text-blue-600 uppercase tracking-tighter">
+                                        Monthly Rent
+                                    </span>
+                                    <span className="text-sm font-bold text-black font-mono">
+                                        RM {prop.rental.toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[8px] font-extrabold text-gray-400 uppercase tracking-tighter">
+                                        Sec. Deposit
+                                    </span>
+                                    <span className="text-sm font-bold text-gray-700 font-mono">
+                                        RM {prop.securityDeposit.toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[8px] font-extrabold text-gray-400 uppercase tracking-tighter">
+                                        Util. Deposit
+                                    </span>
+                                    <span className="text-sm font-bold text-gray-700 font-mono">
+                                        RM {prop.utilityDeposit.toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Optional: Show expiry date if vacant/expired */}
+                            {prop.isVacant && prop.endDate && (
+                                <div className="text-[9px] text-red-500 font-bold italic mt-[-4px]">
+                                    * Lease ended on {new Date(prop.endDate).toLocaleDateString('en-GB')}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
