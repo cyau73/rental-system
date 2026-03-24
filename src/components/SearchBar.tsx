@@ -45,7 +45,7 @@ export default function SearchBar() {
     };
 
     return (
-        <div className="relative w-full md:w-72 group">
+        <div className="relative w-full group">
             {/* Search Icon */}
             <span className="absolute left-3 top-3.5 text-gray-400 font-extrabold z-10">
                 🔍

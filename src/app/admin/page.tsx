@@ -50,13 +50,39 @@ LEFT JOIN "Tenant" t ON t.id = (
   ORDER BY "startDate" DESC LIMIT 1
 )
   WHERE 
-(p.title ILIKE ${searchTerm} OR p.address ILIKE ${searchTerm})
-  AND (
-    (${statusFilter === 'AVAILABLE'} AND p.status IN ('FOR_RENT', 'FOR_SALE'))
-    OR 
-    (${!!statusFilter && statusFilter !== 'AVAILABLE'} AND p.status::text = ${statusFilter})
-    OR 
+  (
+  p.title ILIKE ${searchTerm} OR p.address ILIKE ${searchTerm}
+  OR t.name ILIKE ${searchTerm} 
+  )AND (
+    -- ALL: No filter
     (${!statusFilter})
+    
+    -- NOT AVAILABLE: Properties explicitly marked as off-market
+    OR (${statusFilter === 'NOT_AVAILABLE'} AND p.status = 'NOT_AVAILABLE')
+
+    -- AVAILABLE: Both For Rent and For Sale
+    OR (${statusFilter === 'AVAILABLE'} AND p.status IN ('FOR_RENT', 'FOR_SALE'))
+
+    -- RENTED: Specifically the Rented status
+    OR (${statusFilter === 'RENTED'} AND p.status = 'RENTED')
+
+    -- EXPIRED: Rented without tenants OR any active property with expired/missing dates
+    OR (
+      ${statusFilter === 'EXPIRED'} 
+      AND p.status = 'RENTED' -- The intent is Rented...
+      AND (
+        t.id IS NULL           -- ...but no tenant record exists yet (VACANT)
+        OR t."endDate" < CURRENT_DATE -- ...or the lease has already lapsed
+        OR t."endDate" IS NULL -- ...or the lease exists but is missing the end date
+      )
+    )
+    -- EXPIRING: Strictly between 3 and 6 months from now
+    OR (
+      ${statusFilter === 'EXPIRING'} 
+      AND p.status NOT IN ('FOR_SALE', 'SOLD', 'NOT_AVAILABLE')
+      AND t."endDate" >= CURRENT_DATE + INTERVAL '3 months'
+      AND t."endDate" <= CURRENT_DATE + INTERVAL '6 months'
+    )
   )
 ORDER BY 
   -- 1. KEEP PINNED AT THE TOP
@@ -82,6 +108,60 @@ ORDER BY
   p."order" ASC
 `;
 
+  // 1. Declare your date windows FIRST
+  const threeMonthsOut = new Date();
+  threeMonthsOut.setMonth(threeMonthsOut.getMonth() + 3);
+
+  const sixMonthsOut = new Date();
+  sixMonthsOut.setMonth(sixMonthsOut.getMonth() + 6);
+
+  // 2. Execute the counts
+  const [rentedCount, notAvailableCount, availableCount, expiredCount, expiringCount] = await Promise.all([
+    // ALL RENTED: Total properties with status 'RENTED'
+    prisma.property.count({ where: { status: 'RENTED' } }),
+    prisma.property.count({ where: { status: 'NOT_AVAILABLE' } }),
+
+    // ALL AVAILABLE: Combined For Rent & For Sale
+    prisma.property.count({ where: { status: { in: ['FOR_RENT', 'FOR_SALE'] } } }),
+
+    // EXPIRED: Status is Rented, but data is missing or old
+    prisma.property.count({
+      where: {
+        status: 'RENTED',
+        OR: [
+          { tenants: { none: {} } }, // No tenant record
+          {
+            NOT: {
+              tenants: {
+                some: { endDate: { gte: new Date() } } // No future/current dates found
+              }
+            }
+          },
+          { tenants: { some: { endDate: null } } } // Record exists but date is blank
+        ]
+      }
+    }),
+
+    // ✅ Expired if there are NO active/future leases
+    prisma.property.count({
+      where: {
+        status: 'RENTED',
+        tenants: {
+          // 1. Must have a tenant expiring in the 3-6 month window
+          some: {
+            endDate: { gte: threeMonthsOut, lte: sixMonthsOut },
+          },
+          // 2. IMPORTANT: Must NOT have any tenant with an end date BEYOND 6 months
+          // This ensures the 3-6 month tenant is actually the latest one.
+          none: {
+            endDate: { gt: sixMonthsOut }
+          }
+        }
+      }
+    })
+
+  ]);
+
   const searchTotal = rawProperties.length;
 
   // B. Total Database Count (The Inventory)
@@ -98,12 +178,17 @@ ORDER BY
   // 3. SERIALIZATION FIX: Convert Prisma Decimals/Dates to Plain Objects
   const properties = rawProperties.map(prop => {
     // 1. Logic to determin if the Tenant is "Current" or "Previous" based on endDate
-    const endDate = prop.endDate ? new Date(prop.endDate) : null;
-    const isExpired = endDate && endDate < now;
+    const endDateObj = prop.endDate ? new Date(prop.endDate) : null;
+    const isExpired = endDateObj && endDateObj < now;
+    const noTenant = !prop.currentTenantName;
+    const noDate = prop.currentTenantName && !endDateObj;
+
+    const isExcluded = ['FOR_SALE', 'SOLD', 'NOT_AVAILABLE'].includes(prop.status);
+    const isVacant = !isExcluded && (noTenant || isExpired || noDate);
 
     // Format the date for the UI
-    const formattedEndDate = endDate
-      ? endDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const formattedEndDate = endDateObj // ✅ Use the object you just created
+      ? endDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
       : null;
 
     let tenantDisplay = "VACANT";
@@ -113,12 +198,16 @@ ORDER BY
         : prop.currentTenantName;
     }
 
-    // Define the dynamic availability string
-    let availabilityLabel = prop.status.replace(/_/g, ' '); // Fallback
-    if (isExpired) {
-      availabilityLabel = `ENDED (${formattedEndDate})`;
-    } else if (prop.status === 'RENTED' && formattedEndDate) {
-      availabilityLabel = `RENTED (UNTIL ${formattedEndDate})`;
+    // Final logic for the display label
+    let availabilityLabel = prop.status.replace(/_/g, ' ');
+
+    // Inside properties.map logic
+    if (prop.status === 'RENTED' && noTenant) {
+      availabilityLabel = "RENTED (PENDING TENANT DATA)";
+    } else if (prop.status === 'RENTED' && isExpired) {
+      availabilityLabel = "RENTED (LEASE EXPIRED)";
+    } else if (prop.status === 'RENTED' && noDate) {
+      availabilityLabel = "RENTED (MISSING END DATE)";
     }
 
     // 2. Return the object explicitly
@@ -136,7 +225,7 @@ ORDER BY
 
       // Use the logic variables we calculated above
       currentTenant: tenantDisplay,
-      isVacant: !prop.currentTenantName || isExpired,
+      isVacant: noTenant || isExpired || noDate,
       displayStatus: availabilityLabel.toUpperCase(), // Keep it bold/uppercase
       endDate: prop.endDate, // Keep raw date for other logic if needed
 
@@ -165,39 +254,117 @@ ORDER BY
   const uniqueBuildings = new Set(buildingNames);
 
   const getTabClass = (active: boolean) =>
-    `px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${active ? "bg-blue-600 text-white shadow-md" : "text-gray-400 hover:text-gray-900 hover:bg-white"
+    `relative px-4 py-2 mr-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${active
+      ? "bg-blue-600 text-white shadow-md"
+      : "text-gray-400 hover:text-gray-900 hover:bg-white"
     }`;
+
+  const Badge = ({
+    count,
+    active,
+    type
+  }: {
+    count: number;
+    active: boolean;
+    type: 'ALL' | 'AVAILABLE' | 'RENTED' | 'EXPIRED' | 'EXPIRING'
+  }) => {
+    if (count === 0) return null;
+
+    // Exact mapping to match your PropertyDraggable status colors
+    const colorMap = {
+      ALL: 'bg-gray-500 border-gray-500',
+      AVAILABLE: 'bg-emerald-500 border-emerald-500',
+      RENTED: 'bg-blue-600 border-blue-600',
+      EXPIRED: 'bg-red-600 border-red-600',
+      EXPIRING: 'bg-amber-500 border-amber-500',
+      NOT_AVAILABLE: 'bg-slate-400 border-slate-400', // Distinct neutral color      
+    };
+
+    return (
+      <span className={`
+      absolute -top-2 -right-3
+      flex items-center justify-center 
+      min-w-[18px] h-[18px] px-1
+      rounded-full 
+      text-[8px] font-black leading-none
+      border-2 ${active ? 'ring-2 ring-white' : 'border-transparent'}
+      ${colorMap[type]} 
+      text-white shadow-sm transition-all z-20
+    `}>
+        {count}
+      </span>
+    );
+  };
+
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans selection:bg-blue-100">
       <AdminNav user={session.user} />
 
       <main className="max-w-7xl mx-auto px-4 md:px-6 lg:px-10 pt-4 md:pt-6 pb-10">
-        {/* HEADER & FILTERS */}
-        <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Link href="/admin" className={getTabClass(!statusFilter)}>All</Link>
+        {/* COMPACT HEADER (TABS + RESET BUTTON) */}
+        {/* 1. COMPACT HEADER (TABS + RESET BUTTON) */}
+        <header className="mb-4 flex items-center justify-between gap-2">
+          <div className="flex-1 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 min-w-max pt-3">
+              <Link href="/admin" className={getTabClass(!statusFilter)}>
+                All <Badge count={globalTotal} active={!statusFilter} type="ALL" />
+              </Link>
+
               <Link
                 href={`/admin?status=AVAILABLE${query ? `&query=${query}` : ''}`}
                 className={getTabClass(statusFilter === 'AVAILABLE')}
               >
-                Available
+                Avail <Badge count={availableCount} active={statusFilter === 'AVAILABLE'} type="AVAILABLE" />
               </Link>
 
-              <Link href={`/admin?status=RENTED${query ? `&query=${query}` : ''}`}
-                className={getTabClass(statusFilter === 'RENTED')}>Rented</Link>
+              <Link
+                href={`/admin?status=RENTED${query ? `&query=${query}` : ''}`}
+                className={getTabClass(statusFilter === 'RENTED')}
+              >
+                Rent <Badge count={rentedCount} active={statusFilter === 'RENTED'} type="RENTED" />
+              </Link>
+              <Link
+                href={`/admin?status=NOT_AVAILABLE${query ? `&query=${query}` : ''}`}
+                className={getTabClass(statusFilter === 'NOT_AVAILABLE')}
+              >
+                N/A <Badge count={notAvailableCount} active={statusFilter === 'NOT_AVAILABLE'} type="NOT_AVAILABLE" />
+              </Link>
+              <Link
+                href={`/admin?status=EXPIRED${query ? `&query=${query}` : ''}`}
+                className={getTabClass(statusFilter === 'EXPIRED')}
+              >
+                Exp <Badge count={expiredCount} active={statusFilter === 'EXPIRED'} type="EXPIRED" />
+              </Link>
 
-              {/* Optional: Add Sold */}
-              <Link href={`/admin?status=SOLD${query ? `&query=${query}` : ''}`}
-                className={getTabClass(statusFilter === 'SOLD')}>Sold</Link>
-
+              <Link
+                href={`/admin?status=EXPIRING${query ? `&query=${query}` : ''}`}
+                className={getTabClass(statusFilter === 'EXPIRING')}
+              >
+                Exp (3-6 mths) <Badge count={expiringCount} active={statusFilter === 'EXPIRING'} type="EXPIRING" />
+              </Link>
             </div>
           </div>
-          <div className="w-full md:w-72">
+
+          <div className="shrink-0 pt-2">
+            <ResetOrderButton />
+          </div>
+
+          <div className="shrink-0 pt-2">
             <SearchBar />
           </div>
+
         </header>
+        {/* <section className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 mb-6">
+          <div className="flex flex-col gap-2">
+            <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-1">
+              Search Directory
+            </span>
+            <div className="w-full">
+              <SearchBar />
+            </div>
+          </div>
+        </section> */}
 
         {/* QUICK ADD FORM */}
         <QuickAddToggle>
