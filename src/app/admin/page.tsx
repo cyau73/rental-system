@@ -76,12 +76,12 @@ LEFT JOIN "Tenant" t ON t.id = (
         OR t."endDate" IS NULL -- ...or the lease exists but is missing the end date
       )
     )
-    -- EXPIRING: Strictly between 3 and 6 months from now
+    -- EXPIRING: Strictly between 3 and 9 months from now
     OR (
       ${statusFilter === 'EXPIRING'} 
       AND p.status NOT IN ('FOR_SALE', 'SOLD', 'NOT_AVAILABLE')
       AND t."endDate" >= CURRENT_DATE + INTERVAL '3 months'
-      AND t."endDate" <= CURRENT_DATE + INTERVAL '6 months'
+      AND t."endDate" <= CURRENT_DATE + INTERVAL '9 months'
     )
   )
 ORDER BY 
@@ -114,6 +114,9 @@ ORDER BY
 
   const sixMonthsOut = new Date();
   sixMonthsOut.setMonth(sixMonthsOut.getMonth() + 6);
+
+  const nineMonthsOut = new Date();
+  nineMonthsOut.setMonth(nineMonthsOut.getMonth() + 9);
 
   // 2. Execute the counts
   const [rentedCount, notAvailableCount, availableCount, expiredCount, expiringCount] = await Promise.all([
@@ -149,12 +152,12 @@ ORDER BY
         tenants: {
           // 1. Must have a tenant expiring in the 3-6 month window
           some: {
-            endDate: { gte: threeMonthsOut, lte: sixMonthsOut },
+            endDate: { gte: threeMonthsOut, lte: nineMonthsOut },
           },
           // 2. IMPORTANT: Must NOT have any tenant with an end date BEYOND 6 months
           // This ensures the 3-6 month tenant is actually the latest one.
           none: {
-            endDate: { gt: sixMonthsOut }
+            endDate: { gt: nineMonthsOut }
           }
         }
       }
@@ -177,37 +180,41 @@ ORDER BY
 
   // 3. SERIALIZATION FIX: Convert Prisma Decimals/Dates to Plain Objects
   const properties = rawProperties.map(prop => {
-    // 1. Logic to determin if the Tenant is "Current" or "Previous" based on endDate
     const endDateObj = prop.endDate ? new Date(prop.endDate) : null;
     const isExpired = endDateObj && endDateObj < now;
-    const noTenant = !prop.currentTenantName;
-    const noDate = prop.currentTenantName && !endDateObj;
+    const hasTenant = !!prop.currentTenantName;
+    const hasEndDate = !!endDateObj;
 
-    const isExcluded = ['FOR_SALE', 'SOLD', 'NOT_AVAILABLE'].includes(prop.status);
-    const isVacant = !isExcluded && (noTenant || isExpired || noDate);
+    // 1. Determine the Display Label
+    let label = prop.status.replace(/_/g, ' ');
 
-    // Format the date for the UI
-    const formattedEndDate = endDateObj // ✅ Use the object you just created
+    // Only format the date if the object exists
+    const dateStr = endDateObj
       ? endDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
-      : null;
+      : "";
 
-    let tenantDisplay = "VACANT";
-    if (prop.currentTenantName) {
-      tenantDisplay = isExpired
-        ? `PREVIOUS: ${prop.currentTenantName}`
-        : prop.currentTenantName;
+    if (prop.status === 'RENTED') {
+      if (!hasTenant) {
+        label = "RENTED (PENDING TENANT DATA)";
+      } else if (isExpired) {
+        // ✅ Now shows "EXPIRED: 24/03/2024"
+        label = `EXPIRED: ${dateStr}`;
+      } else if (!hasEndDate) {
+        label = "RENTED (MISSING END DATE)";
+      } else {
+        // ✅ Now shows "EXPIRY: 24/03/2026" (Fixed the stray ')' from your snippet)
+        label = `EXPIRY: ${dateStr}`;
+      }
     }
 
-    // Final logic for the display label
-    let availabilityLabel = prop.status.replace(/_/g, ' ');
-
-    // Inside properties.map logic
-    if (prop.status === 'RENTED' && noTenant) {
-      availabilityLabel = "RENTED (PENDING TENANT DATA)";
-    } else if (prop.status === 'RENTED' && isExpired) {
-      availabilityLabel = "RENTED (LEASE EXPIRED)";
-    } else if (prop.status === 'RENTED' && noDate) {
-      availabilityLabel = "RENTED (MISSING END DATE)";
+    // 2. Determine the Badge Variant (Color State)
+    let variant = 'success';
+    if (prop.status === 'NOT_AVAILABLE' || prop.status === 'SOLD') {
+      variant = 'neutral';
+    } else if (prop.status === 'RENTED' && (!hasTenant || isExpired || !hasEndDate)) {
+      variant = 'danger'; // Red for missing data or expired leases
+    } else if (prop.status === 'FOR_RENT' || prop.status === 'FOR_SALE') {
+      variant = 'danger'; // Vacant/Active listings usually shown as "Action Required"
     }
 
     // 2. Return the object explicitly
@@ -224,10 +231,10 @@ ORDER BY
       utilityDeposit: Number(prop.utilityDeposit || 0),
 
       // Use the logic variables we calculated above
-      currentTenant: tenantDisplay,
-      isVacant: noTenant || isExpired || noDate,
-      displayStatus: availabilityLabel.toUpperCase(), // Keep it bold/uppercase
-      endDate: prop.endDate, // Keep raw date for other logic if needed
+      currentTenant: prop.currentTenantName || "VACANT",
+      displayStatus: label.toUpperCase(),
+      badgeVariant: variant, // Passing a clean string 'danger' | 'success' | 'neutral'
+      isVacant: !hasTenant || isExpired || !hasEndDate, endDate: prop.endDate, // Keep raw date for other logic if needed
 
       // Convert Dates to Strings for Client Components
       createdAt: prop.createdAt instanceof Date ? prop.createdAt.toISOString() : prop.createdAt,
@@ -341,7 +348,7 @@ ORDER BY
                 href={`/admin?status=EXPIRING${query ? `&query=${query}` : ''}`}
                 className={getTabClass(statusFilter === 'EXPIRING')}
               >
-                Exp (3-6 mths) <Badge count={expiringCount} active={statusFilter === 'EXPIRING'} type="EXPIRING" />
+                Exp (3-9 mths) <Badge count={expiringCount} active={statusFilter === 'EXPIRING'} type="EXPIRING" />
               </Link>
             </div>
           </div>
@@ -355,16 +362,6 @@ ORDER BY
           </div>
 
         </header>
-        {/* <section className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 mb-6">
-          <div className="flex flex-col gap-2">
-            <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest ml-1">
-              Search Directory
-            </span>
-            <div className="w-full">
-              <SearchBar />
-            </div>
-          </div>
-        </section> */}
 
         {/* QUICK ADD FORM */}
         <QuickAddToggle>
@@ -417,19 +414,6 @@ ORDER BY
                     <option value="NOT_AVAILABLE">Not Available</option>
                   </select>
                 </div>
-
-                {/* <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-extrabold text-black ml-1 uppercase tracking-widest">
-                    Photos
-                  </label>
-                  <input
-                    name="images"
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    className="text-[10px] file:bg-blue-600 file:text-white file:font-bold file:rounded-lg file:border-0 file:px-3 file:py-1 text-black"
-                  />
-                </div> */}
               </div>
               <SubmitButton label="Add New Property" />
             </form>

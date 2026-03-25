@@ -243,7 +243,15 @@ function SortablePropertyCard({ prop, onPin }: { prop: any; onPin: () => void })
                                     <span className="text-[8px] font-extrabold text-gray-400 uppercase tracking-widest">
                                         Availability
                                     </span>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${prop.isVacant ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                                    <span className={`
+                                        text-[10px] md:text-[10px] 
+                                        font-bold px-2.5 py-1 rounded-md 
+                                        whitespace-nowrap w-fit inline-block tracking-tight
+                                        ${{
+                                            danger: 'bg-red-50 text-red-700 border border-red-100',
+                                            success: 'bg-green-50 text-green-700 border border-green-100',
+                                            neutral: 'bg-gray-100 text-gray-500 border border-gray-200'
+                                        }[prop.badgeVariant]}`}>
                                         {prop.displayStatus}
                                     </span>
                                 </div>
