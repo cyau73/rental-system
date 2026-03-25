@@ -309,66 +309,80 @@ ORDER BY
       <AdminNav user={session.user} />
 
       <main className="max-w-7xl mx-auto px-4 md:px-6 lg:px-10 pt-4 md:pt-6 pb-10">
-        {/* COMPACT HEADER (TABS + RESET BUTTON) */}
-        {/* 1. COMPACT HEADER (TABS + RESET BUTTON) */}
-        <header className="mb-4 flex items-center justify-between gap-2">
-          <div className="flex-1 overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-1.5 min-w-max pt-3">
+        {/* 1. MAIN HEADER: Title + Search (Matched to Reports) */}
+        <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-black text-black tracking-tight uppercase">
+              Property Management
+            </h1>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">
+              Overview of Portfolio Status
+            </p>
+          </div>
+
+          {/* Search Bar - Fixed width on Desktop */}
+          <div className="w-full md:w-72">
+            <SearchBar />
+          </div>
+        </header>
+        {/* 2. TAB NAVIGATION: Horizontal Scroll + Badges */}
+        <div className="mb-4 border-b border-gray-100 pb-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 min-w-max pt-2">
+              {/* ALL TAB */}
               <Link href="/admin" className={getTabClass(!statusFilter)}>
                 All <Badge count={globalTotal} active={!statusFilter} type="ALL" />
               </Link>
 
-              <Link
-                href={`/admin?status=AVAILABLE${query ? `&query=${query}` : ''}`}
-                className={getTabClass(statusFilter === 'AVAILABLE')}
-              >
-                Avail <Badge count={availableCount} active={statusFilter === 'AVAILABLE'} type="AVAILABLE" />
-              </Link>
-
+              {/* RENTED TAB */}
               <Link
                 href={`/admin?status=RENTED${query ? `&query=${query}` : ''}`}
                 className={getTabClass(statusFilter === 'RENTED')}
               >
-                Rent <Badge count={rentedCount} active={statusFilter === 'RENTED'} type="RENTED" />
+                Rented <Badge count={rentedCount} active={statusFilter === 'RENTED'} type="RENTED" />
               </Link>
+
+              {/* AVAILABLE TAB */}
+              <Link
+                href={`/admin?status=AVAILABLE${query ? `&query=${query}` : ''}`}
+                className={getTabClass(statusFilter === 'AVAILABLE')}
+              >
+                Available <Badge count={availableCount} active={statusFilter === 'AVAILABLE'} type="AVAILABLE" />
+              </Link>
+
+              {/* EXPIRED TAB */}
+              <Link
+                href={`/admin?status=EXPIRED${query ? `&query=${query}` : ''}`}
+                className={getTabClass(statusFilter === 'EXPIRED')}
+              >
+                Expired <Badge count={expiredCount} active={statusFilter === 'EXPIRED'} type="EXPIRED" />
+              </Link>
+
+              {/* EXPIRING TAB */}
+              <Link
+                href={`/admin?status=EXPIRING${query ? `&query=${query}` : ''}`}
+                className={getTabClass(statusFilter === 'EXPIRING')}
+              >
+                Soon <Badge count={expiringCount} active={statusFilter === 'EXPIRING'} type="EXPIRING" />
+              </Link>
+
+              {/* NOT AVAILABLE TAB */}
               <Link
                 href={`/admin?status=NOT_AVAILABLE${query ? `&query=${query}` : ''}`}
                 className={getTabClass(statusFilter === 'NOT_AVAILABLE')}
               >
                 N/A <Badge count={notAvailableCount} active={statusFilter === 'NOT_AVAILABLE'} type="NOT_AVAILABLE" />
               </Link>
-              <Link
-                href={`/admin?status=EXPIRED${query ? `&query=${query}` : ''}`}
-                className={getTabClass(statusFilter === 'EXPIRED')}
-              >
-                Exp <Badge count={expiredCount} active={statusFilter === 'EXPIRED'} type="EXPIRED" />
-              </Link>
-
-              <Link
-                href={`/admin?status=EXPIRING${query ? `&query=${query}` : ''}`}
-                className={getTabClass(statusFilter === 'EXPIRING')}
-              >
-                Exp (3-9 mths) <Badge count={expiringCount} active={statusFilter === 'EXPIRING'} type="EXPIRING" />
-              </Link>
             </div>
           </div>
-
-          <div className="shrink-0 pt-2">
-            <ResetOrderButton />
-          </div>
-
-          <div className="shrink-0 pt-2">
-            <SearchBar />
-          </div>
-
-        </header>
+        </div>
 
         {/* QUICK ADD FORM */}
         <QuickAddToggle>
-          <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-8">
+          <section className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 mb-4">
             {/* Section Title: Changed to black and extrabold */}
-            <h2 className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-black mb-4">
-              Quick Add Property
+            <h2 className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-black mb-2">
+              Add Property
             </h2>
 
             <form action={addProperty} className="flex flex-col gap-4">

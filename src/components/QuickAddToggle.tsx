@@ -38,7 +38,7 @@ export default function QuickAddToggle({ children }: QuickAddToggleProps) {
     }
 
     return (
-        <div className="w-full mb-10">
+        <div className="w-full mb-4">
             {/* Toggle Button with Triangle */}
             <button
                 onClick={toggleVisibility}
@@ -57,14 +57,14 @@ export default function QuickAddToggle({ children }: QuickAddToggleProps) {
                     }}
                 />
                 <span className="text-xs font-bold uppercase tracking-widest text-gray-500 group-hover:text-gray-700">
-                    {isVisible ? 'Hide' : 'Show'} Quick Add Property
+                    {isVisible ? 'Hide' : 'Show'} Add Property
                 </span>
             </button>
 
             {/* Animated Container for the Form */}
             <div
                 className={`transition-all duration-300 ease-in-out overflow-hidden ${isVisible
-                    ? 'mt-6 opacity-100 max-h-[500px] visible'
+                    ? 'mt-4 opacity-100 max-h-[500px] visible'
                     : 'mt-0 opacity-0 max-h-0 invisible'
                     }`}
             >
