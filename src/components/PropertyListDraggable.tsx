@@ -42,49 +42,54 @@ export default function PropertyListDraggable({ properties = [] }: { properties:
         })
     );
 
+    // Helper to handle the actual DB update
+    const saveOrder = async (newItems: any[]) => {
+        // We sort locally first so the index we send to the DB 
+        // matches the visual order the user just created.
+        const sortedForDB = [...newItems].sort((a, b) => {
+            if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+            return 0; // Keep the dnd-kit moved order within the pin groups
+        });
+
+        const updates = sortedForDB.map((item, index) => ({
+            id: item.id,
+            order: index,
+            isPinned: !!item.isPinned
+        }));
+
+        await updatePropertyOrder(updates);
+    };
+
     async function handleDragEnd(event: DragEndEvent) {
         const { active, over } = event;
+
         if (over && active.id !== over.id) {
             const oldIndex = items.findIndex((i) => i.id === active.id);
             const newIndex = items.findIndex((i) => i.id === over.id);
 
             const newArray = arrayMove(items, oldIndex, newIndex);
+
+            // Update local state immediately for snappy UI
             setItems(newArray);
 
-            const updates = newArray.map((item, index) => ({
-                id: item.id,
-                order: index,
-                isPinned: item.isPinned
-            }));
-            await updatePropertyOrder(updates);
+            // Save to DB
+            await saveOrder(newArray);
         }
     }
 
     const togglePin = async (id: string) => {
-        const newItems = items.map(item =>
+        const updatedItems = items.map(item =>
             item.id === id ? { ...item, isPinned: !item.isPinned } : item
         );
 
-        // Re-sort to respect the Pin -> Order hierarchy
-        const sorted = [...newItems].sort((a, b) => {
-            // 1. Pins always win
+        // Re-sort: Pinned first, then by existing order
+        const sorted = [...updatedItems].sort((a, b) => {
             if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-
-            // 2. Then follow the manual 'order'
-            if (a.order !== b.order) return a.order - b.order;
-
-            // 3. Fallback to title logic if order is the same (usually 0)
-            return a.title.localeCompare(b.title, undefined, { numeric: true });
+            return (a.order || 0) - (b.order || 0);
         });
 
         setItems(sorted);
-
-        const updates = sorted.map((item, index) => ({
-            id: item.id,
-            order: index,
-            isPinned: item.isPinned
-        }));
-        await updatePropertyOrder(updates);
+        await saveOrder(sorted);
     };
 
     // Static shell for Server-Side Rendering to prevent hydration errors

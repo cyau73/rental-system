@@ -207,8 +207,8 @@ export default function AdminDashboard({ properties = [] }: { properties: any[] 
                                 <div className="flex items-center gap-4">
                                     {/* THE ROTATING CHEVRON BOX */}
                                     <div className={`w-12 h-12 flex items-center justify-center rounded-2xl border transition-all duration-500 ${isOpen
-                                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200'
-                                            : 'bg-gray-50 border-gray-100 text-gray-400'
+                                        ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200'
+                                        : 'bg-gray-50 border-gray-100 text-gray-400'
                                         }`}>
                                         <IconChevron isOpen={isOpen} />
                                     </div>
@@ -262,13 +262,14 @@ export default function AdminDashboard({ properties = [] }: { properties: any[] 
 
                                                     {/* TENANT INFO */}
                                                     <div className="flex-grow flex items-center gap-3">
-                                                        <div className={`w-1.5 h-1.5 rounded-full ${item.tenant ? 'bg-green-500' : 'bg-gray-200'}`} />
+                                                        {/* Use currentTenant which we defined in the service */}
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${item.currentTenant !== 'VACANT' ? 'bg-green-500' : 'bg-gray-200'}`} />
                                                         <div className="flex flex-col">
-                                                            <span className={`text-[11px] font-bold tracking-tight ${item.tenant ? 'text-gray-900' : 'text-gray-400 italic'}`}>
-                                                                {item.tenant || 'Vacant / Available'}
+                                                            <span className={`text-[11px] font-bold tracking-tight ${item.currentTenant !== 'VACANT' ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+                                                                {item.currentTenant}
                                                             </span>
-                                                            {/* Small address sub-text if needed */}
-                                                            <span className="text-[11px] text-gray-400 font-medium truncate">
+                                                            {/* Small address sub-text */}
+                                                            <span className="text-[10px] text-gray-400 font-medium truncate max-w-[200px]">
                                                                 {item.address}
                                                             </span>
                                                         </div>

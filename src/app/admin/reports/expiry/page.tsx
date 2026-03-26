@@ -7,6 +7,8 @@ import prisma from "@/lib/prisma";
 import SearchBar from "@/components/SearchBar";
 import Link from "next/link";
 import PropertyListDraggable from "@/components/PropertyListDraggable";
+import { getPropertiesWithLatestTenant } from "@/lib/property-service";
+import { Prisma } from "@prisma/client";
 
 export default async function ExpiryReportPage({
     searchParams,
@@ -60,53 +62,8 @@ export default async function ExpiryReportPage({
         })
     );
 
-    // 2. Main Data Fetch
-    const rawProperties: any[] = await prisma.$queryRaw`
-    SELECT 
-        p.*, 
-        t.name as "currentTenantName", 
-        t."startDate", t."endDate",
-        t."securityDeposit",
-        t."utilityDeposit"
-    FROM "Property" p
-    LEFT JOIN "Tenant" t ON t.id = (
-      SELECT id FROM "Tenant" WHERE "propertyId" = p.id ORDER BY "startDate" DESC LIMIT 1
-    )
-    WHERE 
-      (p.title ILIKE ${searchTerm} OR p.address ILIKE ${searchTerm} OR t.name ILIKE ${searchTerm})
-    AND (
-      -- Case 1: "Before This Year"
-      (${yearFilter === 'PAST'} AND EXTRACT(YEAR FROM t."endDate") < ${currentYear})
-      OR 
-      -- Case 2: Specific Year (2026, 2027, 2028)
-      (${!!yearFilter && yearFilter !== 'PAST'} AND EXTRACT(YEAR FROM t."endDate")::text = ${yearFilter})
-      OR 
-      -- Case 3: All (No filter) - show everything with an end date
-      (${!yearFilter} AND t."endDate" IS NOT NULL)
-    )
-    ORDER BY t."endDate" ASC
-  `;
-
-    // 3. Serialization (Crucial for PropertyListDraggable)
-    const properties = rawProperties.map(prop => ({
-        ...prop,
-        rental: Number(prop.rental || 0),
-        price: prop.price ? Number(prop.price) : null,
-
-        securityDeposit: prop.securityDeposit ? Number(prop.securityDeposit) : 0,
-        utilityDeposit: prop.utilityDeposit ? Number(prop.utilityDeposit) : 0,
-
-        createdAt: prop.createdAt?.toISOString() || null,
-        updatedAt: prop.updatedAt?.toISOString() || null,
-        startDate: prop.startDate?.toISOString() || null,
-        endDate: prop.endDate?.toISOString() || null,
-        displayStatus: prop.endDate
-            ? `EXPIRING ${new Date(prop.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
-            : "NO LEASE DATE",
-
-        currentTenant: prop.currentTenantName || "VACANT",
-
-    }));
+    // Just pass the query and the year filter from params
+    const properties = await getPropertiesWithLatestTenant(query, yearFilter);
 
     const getTabClass = (active: boolean) =>
         `relative px-4 py-2 mr-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${active ? "bg-amber-500 text-white shadow-md" : "text-gray-400 hover:text-gray-900 hover:bg-white"
