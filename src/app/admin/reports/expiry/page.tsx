@@ -34,20 +34,44 @@ export default async function ExpiryReportPage({
         { label: `${currentYear + 2}`, value: (currentYear + 2).toString(), year: currentYear + 2 },
     ];
 
-    const tabCounts = await Promise.all(
-        reportTabs.map(tab => {
+    const [totalExpiryCount, ...tabCounts] = await Promise.all([
+        // 1. Total Expiry Count (Matches your EXPIRED definition)
+        prisma.property.count({
+            where: {
+                status: { notIn: ['FOR_SALE', 'FOR_RENT'] },
+                OR: [
+                    { tenants: { none: {} } },
+                    { tenants: { some: { endDate: null } } },
+                    { tenants: { some: { endDate: { lt: new Date() } } } }
+                ]
+            }
+        }),
+
+        ...reportTabs.map(tab => {
+            // Shared status condition to keep counts consistent
+            const baseStatus = { status: { notIn: ['FOR_SALE', 'FOR_RENT'] } };
+
             if (tab.value === 'PAST') {
                 return prisma.property.count({
                     where: {
-                        tenants: {
-                            some: { endDate: { lt: new Date(`${currentYear}-01-01`) } },
-                            none: { endDate: { gte: new Date(`${currentYear}-01-01`) } } // Ensure no newer lease exists
-                        }
+                        ...baseStatus,
+                        OR: [
+                            { tenants: { none: {} } },
+                            { tenants: { some: { endDate: null } } },
+                            {
+                                tenants: {
+                                    some: { endDate: { lt: new Date(`${currentYear}-01-01`) } },
+                                    none: { endDate: { gte: new Date(`${currentYear}-01-01`) } }
+                                }
+                            }
+                        ]
                     }
                 });
             }
+
             return prisma.property.count({
                 where: {
+                    ...baseStatus,
                     tenants: {
                         some: {
                             endDate: {
@@ -55,12 +79,13 @@ export default async function ExpiryReportPage({
                                 lte: new Date(`${tab.year}-12-31`),
                             }
                         },
-                        none: { endDate: { gt: new Date(`${tab.year}-12-31`) } } // Latest is in this year
+                        // Ensure this is the LATEST lease
+                        none: { endDate: { gt: new Date(`${tab.year}-12-31`) } }
                     }
                 }
             });
         })
-    );
+    ]);
 
     // Just pass the query and the year filter from params
     const properties = await getPropertiesWithLatestTenant(query, yearFilter);
@@ -104,7 +129,7 @@ export default async function ExpiryReportPage({
                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                         <div className="flex items-center gap-1.5 min-w-max pt-2">
                             <Link href="/admin/reports/expiry" className={getTabClass(!yearFilter)}>
-                                All
+                                All <Badge count={totalExpiryCount} active={!yearFilter} />
                             </Link>
 
                             {reportTabs.map((tab, index) => (

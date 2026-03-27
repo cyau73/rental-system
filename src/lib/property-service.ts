@@ -70,29 +70,76 @@ export async function getPropertiesWithLatestTenant(
     `;
 
     // 3. Centralized Serialization
-    return rawProperties.map(prop => ({
-      ...prop,
-      rental: Number(prop.rental || 0),
-      price: prop.price ? Number(prop.price) : null,
-      sale: prop.sale ? Number(prop.sale) : null,
+    return rawProperties.map(prop => {
+      // --- LOGIC FOR UI FIELDS ---
+      const now = new Date();
+      const leaseEnd = prop.endDate ? new Date(prop.endDate).toLocaleDateString('en-GB') : null;
+      const isExpired = !!(prop.endDate && prop.endDate < now);
+      const isVacant = !prop.currentTenantName || isExpired; // If expired, it IS vacant regardless of name
 
-      landArea: prop.landArea ? Number(prop.landArea) : null,
-      builtUp: prop.builtUp ? Number(prop.builtUp) : null,
+      // 3. Status & Variant Logic
+      let displayStatus = prop.status.replace(/_/g, ' ');
+      let badgeVariant = "success"; // Default to green
 
-      securityDeposit: prop.securityDeposit ? Number(prop.securityDeposit) : 0,
-      utilityDeposit: prop.utilityDeposit ? Number(prop.utilityDeposit) : 0,
+      // 3. Status & Variant Logic
+      if (prop.status === 'NOT_AVAILABLE') {
+        displayStatus = "Off Market";
+        badgeVariant = "neutral";
+      }
+      else if (prop.status === 'RENTED') {
+        if (isVacant) {
+          displayStatus = "Vacant";
+          badgeVariant = "neutral";
+        }
+        else if (isExpired) {
+          // ✅ Handle Expired: "Lease Expired on 20/01/2024"
+          displayStatus = `Lease Expired ${leaseEnd ? `on ${leaseEnd}` : ""}`.trim();
+          badgeVariant = "danger";
+        }
+        else if (!leaseEnd) {
+          // ✅ Handle Null Date: Just "Occupied"
+          displayStatus = "Occupied";
+          badgeVariant = "success";
+        }
+        else {
+          // ✅ Handle Active Lease: "Occupied until 20/12/2026"
+          displayStatus = `Occupied until ${leaseEnd}`;
+          badgeVariant = "success";
+        }
+      }
+      else if (prop.status === 'FOR_RENT' || prop.status === 'FOR_SALE') {
+        displayStatus = prop.status.replace('_', ' ');
+        badgeVariant = "danger";
+      }
 
-      createdAt: prop.createdAt instanceof Date ? prop.createdAt.toISOString() : prop.createdAt,
-      updatedAt: prop.updatedAt instanceof Date ? prop.updatedAt.toISOString() : prop.updatedAt,
-      startDate: prop.startDate instanceof Date ? prop.startDate.toISOString() : prop.startDate,
-      endDate: prop.endDate instanceof Date ? prop.endDate.toISOString() : prop.endDate,
+      return {
+        ...prop,
+        rental: Number(prop.rental || 0),
+        price: prop.price ? Number(prop.price) : null,
+        sale: prop.sale ? Number(prop.sale) : null,
 
-      images: Array.isArray(prop.images) ? prop.images : [],
-      currentTenant: prop.currentTenantName || "VACANT",
+        landArea: prop.landArea ? Number(prop.landArea) : null,
+        builtUp: prop.builtUp ? Number(prop.builtUp) : null,
 
-      order: prop.order !== null ? Number(prop.order) : 0,
-      isPinned: Boolean(prop.isPinned),
-    }));
+        securityDeposit: prop.securityDeposit ? Number(prop.securityDeposit) : 0,
+        utilityDeposit: prop.utilityDeposit ? Number(prop.utilityDeposit) : 0,
+
+        createdAt: prop.createdAt instanceof Date ? prop.createdAt.toISOString() : prop.createdAt,
+        updatedAt: prop.updatedAt instanceof Date ? prop.updatedAt.toISOString() : prop.updatedAt,
+        startDate: prop.startDate instanceof Date ? prop.startDate.toISOString() : prop.startDate,
+        endDate: prop.endDate instanceof Date ? prop.endDate.toISOString() : prop.endDate,
+
+        images: Array.isArray(prop.images) ? prop.images : [],
+        currentTenant: prop.currentTenantName || "VACANT",
+
+        order: prop.order !== null ? Number(prop.order) : 0,
+        isPinned: Boolean(prop.isPinned),
+
+        displayStatus,
+        badgeVariant,
+        isVacant,
+      };
+    });
 
   } catch (error) {
     console.error("Prisma Query Error:", error);

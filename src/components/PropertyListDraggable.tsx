@@ -159,6 +159,8 @@ function SortablePropertyCard({ prop, onPin }: { prop: any; onPin: () => void })
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
     const whatsappLink = `https://wa.me/?text=${encodeURIComponent(`Check out ${prop.title}: ${baseUrl}/properties/${prop.id}`)}`;
 
+    const expiryDate = new Date(prop.endDate).toLocaleDateString('en-GB');
+
     return (
         <>
             <div
@@ -293,7 +295,7 @@ function SortablePropertyCard({ prop, onPin }: { prop: any; onPin: () => void })
                             {/* Optional: Show expiry date if vacant/expired */}
                             {prop.isVacant && prop.endDate && (
                                 <div className="text-[9px] text-red-500 font-bold italic mt-[-4px]">
-                                    * Lease ended on {new Date(prop.endDate).toLocaleDateString('en-GB')}
+                                    * Lease ended on {expiryDate}
                                 </div>
                             )}
                         </div>
