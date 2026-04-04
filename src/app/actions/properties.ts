@@ -142,8 +142,8 @@ export async function addProperty(formData: FormData) {
                 slug,
                 address,
                 type,
-                landArea: landArea ? parseFloat(landArea) : null, // Ensure numeric for Decimal
-                builtUp: builtUp ? parseFloat(builtUp) : null,   // Ensure numeric for Decimal
+                landArea: landArea ? parseFloat(landArea) : 0.0, // Ensure numeric for Decimal
+                builtUp: builtUp ? parseFloat(builtUp) : 0.0,   // Ensure numeric for Decimal
                 rental: cleanRental,
                 price: cleanPrice,
                 remarks,
