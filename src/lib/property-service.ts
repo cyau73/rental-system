@@ -78,37 +78,46 @@ export async function getPropertiesWithLatestTenant(
       const isVacant = !prop.currentTenantName || isExpired; // If expired, it IS vacant regardless of name
 
       // 3. Status & Variant Logic
-      let displayStatus = prop.status.replace(/_/g, ' ');
-      let badgeVariant = "success"; // Default to green
+      const rawStatus = prop.status.toLowerCase().split('_');
+      const camelStatus = rawStatus
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 
-      // 3. Status & Variant Logic
+      let displayStatus = camelStatus;
+      let badgeVariant = "success"; // Default
+
+      // Helper for the "Last" date reference
+      const lastRef = leaseEnd ? ` (Since: ${leaseEnd})` : "";
+
+      // 4. New logic
       if (prop.status === 'NOT_AVAILABLE') {
         displayStatus = "Off Market";
         badgeVariant = "neutral";
       }
       else if (prop.status === 'RENTED') {
         if (isVacant) {
-          displayStatus = "Vacant";
+          // Logic: Technically Rented in DB but no active tenant or expired
+          displayStatus = `Vacant${lastRef}`;
           badgeVariant = "neutral";
         }
         else if (isExpired) {
-          // ✅ Handle Expired: "Lease Expired on 20/01/2024"
-          displayStatus = `Lease Expired ${leaseEnd ? `on ${leaseEnd}` : ""}`.trim();
+          // Logic: "Lease Expired on 20/01/2024"
+          displayStatus = `Tenancy Expired ${leaseEnd ? `on ${leaseEnd}` : ""}`.trim();
           badgeVariant = "danger";
         }
         else if (!leaseEnd) {
-          // ✅ Handle Null Date: Just "Occupied"
           displayStatus = "Occupied";
           badgeVariant = "success";
         }
         else {
-          // ✅ Handle Active Lease: "Occupied until 20/12/2026"
           displayStatus = `Occupied until ${leaseEnd}`;
           badgeVariant = "success";
         }
       }
       else if (prop.status === 'FOR_RENT' || prop.status === 'FOR_SALE') {
-        displayStatus = prop.status.replace('_', ' ');
+        // Logic: Display "For Rent (Last: 20/01/2024)" or "For Sale (Last: 20/01/2024)"
+        const cleanStatus = prop.status.replace('_', ' ');
+        displayStatus = `${camelStatus}${lastRef}`;
         badgeVariant = "danger";
       }
 
